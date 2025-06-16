@@ -14,3 +14,6 @@ mnist_png/
 # System files
 .DS_Store
 Thumbs.db
+
+misc_references/
+training_images/
