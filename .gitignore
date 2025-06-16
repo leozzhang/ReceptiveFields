@@ -1,0 +1,16 @@
+# MATLAB specific
+*.asv
+*.m~
+*.mex*
+*.p
+*.slx.autosave
+*.slxc
+slprj/
+
+# Large data files
+*.mat
+mnist_png/
+
+# System files
+.DS_Store
+Thumbs.db
