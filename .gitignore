@@ -15,5 +15,5 @@ mnist_png/
 .DS_Store
 Thumbs.db
 
-misc references/
-training images/
+misc_references/
+training_images/
