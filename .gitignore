@@ -10,9 +10,10 @@ slprj/
 # Large data files
 *.mat
 mnist_png/
-misc references/
-training images/
 
 # System files
 .DS_Store
 Thumbs.db
+
+misc references/
+training images/
