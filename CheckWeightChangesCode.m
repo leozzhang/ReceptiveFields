@@ -8,14 +8,12 @@ layers = [
     convolution2dLayer(5, 6, 'Name', 'conv1')      % Just 6 filters - easy to visualize
     reluLayer('Name', 'relu1')
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
-    fullyConnectedLayer(84, 'Name', 'fc1')
-    reluLayer('Name', 'relu2')
-    fullyConnectedLayer(10, 'Name', 'fc2')
+    fullyConnectedLayer(10, 'Name', 'fc_output')
     softmaxLayer('Name', 'softmax')
 ];
 
 originalNet = dlnetwork(layers);
-load('scratchmnist.mat','scratchNet');
+load('scratchlitemnist.mat','scratchNetlite');
 % Function to calculate weight differences for each layer
 layerNames = {originalNet.Layers.Name};
 weightChanges = [];
@@ -24,7 +22,7 @@ for i = 1:length(originalNet.Layers)
     if isprop(originalNet.Layers(i), 'Weights') && ~isempty(originalNet.Layers(i).Weights)
         % Calculate the norm of weight differences
         origWeights = originalNet.Layers(i).Weights;
-        newWeights = scratchNet.Layers(i).Weights;
+        newWeights = scratchNetlite.Layers(i).Weights;
         
         if isequal(size(origWeights), size(newWeights))
             weightDiff = norm(origWeights(:) - newWeights(:));
@@ -70,7 +68,7 @@ function visualizeLayerComparison(originalNet, trainedNet, layerNum)
     end
 end
 
-visualizeLayerComparison(originalNet, scratchNet, 2)
+visualizeLayerComparison(originalNet, scratchNetlite, 2)
 %% for 1x1
 function visualizeLayerComparison2(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);

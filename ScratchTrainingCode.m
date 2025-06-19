@@ -6,9 +6,7 @@ layers = [
     convolution2dLayer(5, 6, 'Name', 'conv1')      % Just 6 filters - easy to visualize
     reluLayer('Name', 'relu1')
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
-    fullyConnectedLayer(84, 'Name', 'fc1')
-    reluLayer('Name', 'relu2')
-    fullyConnectedLayer(10, 'Name', 'fc2')
+    fullyConnectedLayer(10, 'Name', 'fc_output')
     softmaxLayer('Name', 'softmax')
 ];
 
@@ -27,7 +25,7 @@ imds_test_resized = augmentedImageDatastore(exinputsize(1:2), imds_test);
 imds_val_resized = augmentedImageDatastore(exinputsize(1:2), imds_val_split);
 
 batchSize=128;
-maxEpochs=2;
+maxEpochs=5;
 learningRate=1e-4;
 
 options=trainingOptions('sgdm','MiniBatchSize',batchSize, ...
@@ -36,18 +34,18 @@ options=trainingOptions('sgdm','MiniBatchSize',batchSize, ...
     'Verbose',true, ...
     'ValidationData',imds_val_resized, ...
     'ValidationFrequency',50,...
-    'ValidationPatience',3,...
+    'ValidationPatience',4,...
     'Plots','training-progress','Metrics','accuracy');
 %% Train
-scratchNet = trainnet(imds_train_resized, net,"crossentropy",options);
+scratchNetlite = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('scratchmnist.mat','scratchNet')
+save('scratchlitemnist.mat','scratchNetlite')
 %% Evaluate
-scores=minibatchpredict(scratchNet,imds_test_resized);
+scores=minibatchpredict(scratchNetlite,imds_test_resized);
 classes=categories(imds_test.Labels);
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(scratchNet,imds_test_resized,"accuracy")
+accuracy=testnet(scratchNetlite,imds_test_resized,"accuracy")
 
 % Display confusion matrix
 figure;
