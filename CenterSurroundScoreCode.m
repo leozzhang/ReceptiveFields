@@ -121,13 +121,12 @@ fprintf('Test 5 - Simulated CNN filter: score = %.3f\n', score5);
 %% 
 function [best_score, best_params] = findBestCenterSurroundMatch_optimized(filter)
     % OPTIMIZED and SIMPLIFIED - just returns the best similarity score
-    % No complex ON/OFF detection that can cause errors
     
     [h, w] = size(filter);
     
-    % OPTIMIZED PARAMETERS for 5x5 filters
-    center_radii = [0.6, 0.9, 1.2];    % Small to medium centers
-    surround_ratios = [1.8, 2.2];       % Conservative ratios
+    % OPTIMIZED for 5x5 filters MAY NEED TO CHANGE FOR DIFF NETS
+    center_radii = [0.6, 0.9, 1.2];    
+    surround_ratios = [1.8, 2.2];       
     
     % Position search - avoid edges
     cx_range = 2:(w-1);
@@ -188,7 +187,7 @@ function cs_score = getCenterSurroundScore(filter)
     cs_score = score;
 end
 %% testing finding best center surround
-
+clc
 test_filter1 = createCenterSurroundTemplate(5, 5, 3, 4, 0.8, 1.8);
 score1 = getCenterSurroundScore(test_filter1);
 fprintf('Perfect CS filter score: %.3f\n', score1);
@@ -198,3 +197,13 @@ rng(42);
 test_filter2 = randn(5, 5);
 score2 = findBestCenterSurroundMatch_optimized(test_filter2);
 fprintf('Random filter score: %.3f\n', score2);
+
+% Test 3: actual scratchnetlite filters
+load('scratchlitemnist.mat','scratchNetlite');
+weights = scratchNetlite.Layers(2).Weights;
+
+for i=1:6
+    fprintf('Filter %d ',i);
+    test_filter=weights(:,:,1,i);
+    getCenterSurroundScore(test_filter);
+end
