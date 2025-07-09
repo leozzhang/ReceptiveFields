@@ -13,7 +13,7 @@ layers = [
 ];
 
 originalNet = dlnetwork(layers);
-load('scratchlitemnist.mat','scratchNetlite');
+load('scratchlitecifar.mat','sNetliteCIFAR');
 % Function to calculate weight differences for each layer
 layerNames = {originalNet.Layers.Name};
 weightChanges = [];
@@ -22,7 +22,7 @@ for i = 1:length(originalNet.Layers)
     if isprop(originalNet.Layers(i), 'Weights') && ~isempty(originalNet.Layers(i).Weights)
         % Calculate the norm of weight differences
         origWeights = originalNet.Layers(i).Weights;
-        newWeights = scratchNetlite.Layers(i).Weights;
+        newWeights = sNetliteCIFAR.Layers(i).Weights;
         
         if isequal(size(origWeights), size(newWeights))
             weightDiff = norm(origWeights(:) - newWeights(:));
@@ -68,7 +68,7 @@ function visualizeLayerComparison(originalNet, trainedNet, layerNum)
     end
 end
 
-visualizeLayerComparison(originalNet, scratchNetlite, 2)
+visualizeLayerComparison(originalNet, sNetliteCIFAR, 2)
 %% for 1x1
 function visualizeLayerComparison2(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);

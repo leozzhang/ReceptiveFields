@@ -199,11 +199,12 @@ score2 = findBestCenterSurroundMatch_optimized(test_filter2);
 fprintf('Random filter score: %.3f\n', score2);
 
 % Test 3: actual scratchnetlite filters
-load('scratchlitemnist.mat','scratchNetlite');
-weights = scratchNetlite.Layers(2).Weights;
+load('scratchlitecifar.mat','sNetliteCIFAR');
+weights = sNetliteCIFAR.Layers(2).Weights;
 num_filters=size(weights,4); %4th dimension of weights contains num filters
+cs_scores=zeros(1,num_filters);
 for i=1:num_filters
     fprintf('Filter %d ',i);
-    test_filter=weights(:,:,1,i);
-    getCenterSurroundScore(test_filter);
+    filter=weights(:,:,1,i);
+    cs_scores(i)=getCenterSurroundScore(filter);
 end
