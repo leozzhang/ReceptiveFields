@@ -10,6 +10,7 @@ slprj/
 # Large data files
 *.mat
 mnist_png/
+cifar10/
 
 # System files
 .DS_Store
