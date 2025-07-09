@@ -193,7 +193,7 @@ score1 = getCenterSurroundScore(test_filter1);
 fprintf('Perfect CS filter score: %.3f\n', score1);
 
 % Test 2: Random filter
-rng(42);
+rng(8);
 test_filter2 = randn(5, 5);
 score2 = findBestCenterSurroundMatch_optimized(test_filter2);
 fprintf('Random filter score: %.3f\n', score2);

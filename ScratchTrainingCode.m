@@ -52,3 +52,11 @@ figure;
 confusionchart(testlabels, predlabels);
 title('Confusion Matrix');
 
+% Center Surround Score
+weights = scratchNetlite.Layers(2).Weights;
+num_filters=size(weights,4); %4th dimension of weights contains num filters
+for i=1:num_filters
+    fprintf('Filter %d ',i);
+    test_filter=weights(:,:,1,i);
+    getCenterSurroundScore(test_filter);
+end
