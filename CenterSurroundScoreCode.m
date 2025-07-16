@@ -48,8 +48,8 @@ w = filter_size(2);
 % Template parameters
 center_x = 3;       % Center position (middle of 5x5 filter)
 center_y = 3;
-center_radius = 1.2;  % Small center
-surround_radius = 1.8*1.2; % Larger surround
+center_radius = 0.6;  % Small center
+surround_radius = 1.8*center_radius; % Larger surround
 
 % Create the template
 template = createCenterSurroundTemplate(h, w, center_x, center_y, center_radius, surround_radius);
@@ -186,16 +186,43 @@ function cs_score = getCenterSurroundScore(filter)
     [score, ~] = findBestCenterSurroundMatch_optimized(filter);
     cs_score = score;
 end
+%% using normxcorr2
+
+function score=normxcorr2csscore(filter)
+    %normxcorr2 removing padding and getting max score
+        
+    template=createCenterSurroundTemplate(3,3,2,2,0.6,1);
+    c=normxcorr2(template, filter);
+    [th,tw]=size(template);
+    [fh,fw]=size(c);
+    padding_h = floor(th/2);
+    padding_w = floor(tw/2);
+    valid_rows = 2*padding_h + 1 : fh - 2*padding_h;
+    valid_cols = 2*padding_w + 1 : fw - 2*padding_w;
+    c=c(valid_rows,valid_cols);
+    figure;
+    imagesc(c)
+    colormap gray
+    colorbar
+    score=max(abs(c(:)));
+end
+
+
 %% testing finding best center surround
 clc
-test_filter1 = createCenterSurroundTemplate(5, 5, 3, 4, 0.8, 1.8);
-score1 = getCenterSurroundScore(test_filter1);
+test_filter1 = createCenterSurroundTemplate(5, 5, 3, 4, 0.6, 1);
+figure;
+imagesc(test_filter1)
+colormap gray
+colorbar
+score1 = normxcorr2csscore(test_filter1);
 fprintf('Perfect CS filter score: %.3f\n', score1);
+%% 
 
 % Test 2: Random filter
 rng(8);
 test_filter2 = randn(5, 5);
-score2 = findBestCenterSurroundMatch_optimized(test_filter2);
+score2 = normxcorr2csscore(test_filter2);
 fprintf('Random filter score: %.3f\n', score2);
 
 % Test 3: actual scratchnetlite filters
@@ -208,3 +235,31 @@ for i=1:num_filters
     filter=weights(:,:,1,i);
     cs_scores(i)=getCenterSurroundScore(filter);
 end
+%% bug fixing
+test_filter1 = createCenterSurroundTemplate(5, 5, 3, 4, 0.6, 1);
+template = createCenterSurroundTemplate(5, 5, 2, 2, 0.6, 1);
+
+
+c = normxcorr2(template, test_filter1);
+fprintf('Raw correlation max: %.3f\n', max(c(:)));
+% Your padding calculation
+[th,tw] = size(template);  % 3,3
+[fh,fw] = size(c);  % 5,5
+
+padding_h = floor(th/2);  % floor(3/2) = 1
+padding_w = floor(tw/2);  % floor(3/2) = 1
+
+valid_rows = 2*padding_h + 1 : fh - 2*padding_h;  % 2:4
+valid_cols = 2*padding_w + 1 : fw - 2*padding_w;  % 2:4
+
+fprintf('Original correlation size: %dx%d\n', size(c,1), size(c,2));
+fprintf('Valid rows: %d to %d\n', valid_rows(1), valid_rows(end));
+fprintf('Valid cols: %d to %d\n', valid_cols(1), valid_cols(end));
+
+c_trimmed = c(valid_rows, valid_cols);
+fprintf('Trimmed correlation max: %.3f\n', max(c_trimmed(:)));
+
+% Show both
+figure;
+subplot(1,2,1); imagesc(c); title('Raw Correlation'); colorbar;
+subplot(1,2,2); imagesc(c_trimmed); title('After Padding Removal'); colorbar;

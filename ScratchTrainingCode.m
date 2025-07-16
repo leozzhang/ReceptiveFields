@@ -140,15 +140,15 @@ layers = [
     convolution2dLayer(5, 6, 'Name', 'conv1')      % Just 6 filters - easy to visualize
     reluLayer('Name', 'relu1')
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
-    fullyConnectedLayer(10, 'Name', 'fc_output')
+    fullyConnectedLayer(4, 'Name', 'fc_output')
     softmaxLayer('Name', 'softmax')
 ];
 
 net=dlnetwork(layers);
 exinputsize=net.Layers(1).InputSize;
 
-trainPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\train';
-testPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\test';
+trainPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10artificial\train';
+testPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10artificial\test';
 imds_train=imageDatastore(trainPath,'IncludeSubfolders',true,'LabelSource','foldernames');
 imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','foldernames');
 [imds_train_split, imds_val_split] = splitEachLabel(imds_train, 0.8, 'randomized');
@@ -169,15 +169,15 @@ options=trainingOptions('sgdm','MiniBatchSize',batchSize, ...
     'ValidationPatience',4,...
     'Plots','training-progress','Metrics','accuracy');
 %% Train
-sNetliteCIFAR = trainnet(imds_train_resized, net,"crossentropy",options);
+sNetliteCIFARart = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('scratchlitecifar.mat','sNetliteCIFAR')
+save('scratchlitecifarart.mat','sNetliteCIFARart')
 %% Evaluate
-scores=minibatchpredict(sNetliteCIFAR,imds_test_resized);
+scores=minibatchpredict(sNetliteCIFARart,imds_test_resized);
 classes=categories(imds_test.Labels);
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(sNetliteCIFAR,imds_test_resized,"accuracy")
+accuracy=testnet(sNetliteCIFARart,imds_test_resized,"accuracy")
 
 % Display confusion matrix
 figure;
@@ -185,8 +185,8 @@ confusionchart(testlabels, predlabels);
 
 title('Confusion Matrix');
 %% center surround score
-load('scratchlitecifar.mat','sNetliteCIFAR');
-weights = sNetliteCIFAR.Layers(2).Weights;
+%load('scratchlitecifar.mat','sNetliteCIFAR');
+weights = sNetliteCIFARart.Layers(2).Weights;
 num_filters=size(weights,4); %4th dimension of weights contains num filters
 cs_scores=zeros(1,num_filters);
 for i=1:num_filters

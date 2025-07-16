@@ -37,6 +37,18 @@ for i = 1:length(originalNet.Layers)
     end
 end
 %% 
+rng(1)
+layers = [
+    imageInputLayer([28 28 1], 'Name', 'input')
+    convolution2dLayer(5, 6, 'Name', 'conv1')      % Just 6 filters - easy to visualize
+    reluLayer('Name', 'relu1')
+    maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
+    fullyConnectedLayer(10, 'Name', 'fc_output')
+    softmaxLayer('Name', 'softmax')
+];
+
+originalNet = dlnetwork(layers);
+load('scratchlitecifarnat.mat','sNetliteCIFARnat');
 function visualizeLayerComparison(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);
     newLayer = trainedNet.Layers(layerNum);
@@ -68,7 +80,7 @@ function visualizeLayerComparison(originalNet, trainedNet, layerNum)
     end
 end
 
-visualizeLayerComparison(originalNet, sNetliteCIFAR, 2)
+visualizeLayerComparison(originalNet, sNetliteCIFARnat, 2)
 %% for 1x1
 function visualizeLayerComparison2(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);
