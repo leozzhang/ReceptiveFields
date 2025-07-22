@@ -39,8 +39,8 @@ end
 %% 
 rng(1)
 layers = [
-    imageInputLayer([28 28 1], 'Name', 'input')
-    convolution2dLayer(5, 6, 'Name', 'conv1')      % Just 6 filters - easy to visualize
+    imageInputLayer([28 28 3], 'Name', 'input')
+    convolution2dLayer(5, 32, 'Name', 'conv1')      % Just 6 filters - easy to visualize
     reluLayer('Name', 'relu1')
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
     fullyConnectedLayer(10, 'Name', 'fc_output')
@@ -48,7 +48,7 @@ layers = [
 ];
 
 originalNet = dlnetwork(layers);
-load('scratchlitecifarnat.mat','sNetliteCIFARnat');
+load('scratchcifar.mat','sNetCIFAR');
 function visualizeLayerComparison(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);
     newLayer = trainedNet.Layers(layerNum);
@@ -57,32 +57,29 @@ function visualizeLayerComparison(originalNet, trainedNet, layerNum)
         origWeights = origLayer.Weights;
         newWeights = newLayer.Weights;
         
-        % For conv layers, show first few filters
-        if ndims(origWeights) == 4  % Convolutional layer
-            numFilters = min(16, size(origWeights, 4));
+        if ndims(origWeights) == 4 % Convolutional layer
+            numFiltersToShow = 6;  % Show only first 6
             
-            figure('Position', [100, 100, 1200, 600]);
-            for i = 1:numFilters
-                % Original filters
-                subplot(2, 6, i);
+            figure('Position', [100, 100, 1200, 400]);
+            for i = 1:numFiltersToShow
+                % Original filters (top row)
+                subplot(2, numFiltersToShow, i);
                 imagesc(origWeights(:,:,1,i));
                 colormap gray; axis off;
                 title(sprintf('Orig F%d', i), 'FontSize', 8);
                 
-                % New filters
-                subplot(2, 6, i + numFilters);
+                % New filters (bottom row)
+                subplot(2, numFiltersToShow, i + numFiltersToShow);
                 imagesc(newWeights(:,:,1,i));
                 colormap gray; axis off;
-                title(sprintf('New F%d', i), 'FontSize', 8);
+                title(sprintf('Trained F%d', i), 'FontSize', 8);
             end
-            sgtitle(sprintf('Layer %d (%s) - Before vs After Training', layerNum, origLayer.Name), 'Interpreter', 'none');
+            sgtitle(sprintf('Layer %d (%s) - First %d Filters: Before vs After', ...
+                layerNum, origLayer.Name, numFiltersToShow), 'Interpreter', 'none');
         end
     end
 end
-
-visualizeLayerComparison(originalNet, sNetliteCIFARnat, 2)
-%% for 1x1
-function visualizeLayerComparison2(originalNet, trainedNet, layerNum)
+function visualizeLayerComparisonRGB(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);
     newLayer = trainedNet.Layers(layerNum);
     
@@ -90,60 +87,30 @@ function visualizeLayerComparison2(originalNet, trainedNet, layerNum)
         origWeights = origLayer.Weights;
         newWeights = newLayer.Weights;
         
-        % Check dimensions and filter size
-        fprintf('Layer %d (%s): Weight dimensions = %s\n', layerNum, origLayer.Name, mat2str(size(origWeights)));
-        
-        % For conv layers, show first few filters
         if ndims(origWeights) == 4 % Convolutional layer
-            numFilters = min(16, size(origWeights, 4));
+            numFiltersToShow = 6;  % Show fewer filters since we're showing RGB
             
-            % Handle different filter sizes
-            filterSize = size(origWeights, 1);
-            if filterSize == 1
-                % For 1x1 filters, show them as bars instead
-                figure('Position', [100, 100, 1200, 400]);
-                
-                subplot(2, 1, 1);
-                bar(squeeze(origWeights(1,1,1,1:numFilters)));
-                title('Original Filters (1x1 shown as bars)', 'Interpreter', 'none');
-                
-                subplot(2, 1, 2);
-                bar(squeeze(newWeights(1,1,1,1:numFilters)));
-                title('New Filters (1x1 shown as bars)', 'Interpreter', 'none');
-                
-                sgtitle(sprintf('Layer %d (%s) - 1x1 Filters', layerNum, origLayer.Name), 'Interpreter', 'none');
-            else
-                % For larger filters, use enhanced visualization
-                figure('Position', [100, 100, 1200, 600]);
-                
-                % Calculate global min/max for consistent scaling
-                allWeights = [origWeights(:); newWeights(:)];
-                globalMin = min(allWeights);
-                globalMax = max(allWeights);
-                
-                for i = 1:numFilters
-                    % Original filters
-                    subplot(4, 8, i);
-                    imagesc(origWeights(:,:,1,i), [globalMin, globalMax]);
+            figure('Position', [100, 100, 1500, 800]);
+            for i = 1:numFiltersToShow
+                for channel = 1:3
+                    % Original filters - RGB channels
+                    subplot(6, numFiltersToShow, (channel-1)*numFiltersToShow + i);
+                    imagesc(origWeights(:,:,channel,i));
                     colormap gray; axis off;
-                    title(sprintf('Orig F%d', i), 'FontSize', 8);
+                    title(sprintf('Orig F%d Ch%d', i, channel), 'FontSize', 8);
                     
-                    % New filters
-                    subplot(4, 8, i + numFilters);
-                    imagesc(newWeights(:,:,1,i), [globalMin, globalMax]);
+                    % Trained filters - RGB channels  
+                    subplot(6, numFiltersToShow, (channel+2)*numFiltersToShow + i);
+                    imagesc(newWeights(:,:,channel,i));
                     colormap gray; axis off;
-                    title(sprintf('New F%d', i), 'FontSize', 8);
+                    title(sprintf('Train F%d Ch%d', i, channel), 'FontSize', 8);
                 end
-                
-                sgtitle(sprintf('Layer %d (%s) - Before vs After Training', layerNum, origLayer.Name), 'Interpreter', 'none');
-                
-                % Add colorbar to show scale
-                colorbar('Position', [0.92, 0.3, 0.02, 0.4]);
             end
+            sgtitle('RGB Channels: Before vs After Training', 'Interpreter', 'none');
         end
     end
 end
-visualizeLayerComparison2(originalNet, trainedNet,137)
+visualizeLayerComparisonRGB(originalNet, sNetCIFAR, 2)
 %% debugging
 % Compare raw weight statistics
 before_weights = squeeze(originalNet.Layers(2).Weights);

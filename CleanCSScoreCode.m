@@ -74,12 +74,14 @@ end
 %% 
 
 clear,clc
-load('scratchmnist.mat','scratchNet');
-weights = scratchNet.Layers(2).Weights;
+load('scratchcifar.mat','sNetCIFAR');
+weights = sNetCIFAR.Layers(2).Weights;
 num_filters=size(weights,4); %4th dimension of weights contains num filters
 cs_scores=zeros(1,num_filters);
 for i=1:num_filters
-    filter=weights(:,:,1,i);
+    filter=weights(:,:,3,i);
     cs_scores(i)=corr2csscore(filter);
     fprintf('Filter %d: %.3f\n',i, cs_scores(i));
 end
+
+disp(strjoin(string(cs_scores), sprintf('\t')))
