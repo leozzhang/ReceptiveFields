@@ -41,15 +41,15 @@ end
 %% testing create center surround template
 
 % Example usage - let's create and visualize a center-surround template
-filter_size = [5, 5];  % Same as your CNN filters
+filter_size = [7, 7];  % Same as your CNN filters
 h = filter_size(1);
 w = filter_size(2);
 
 % Template parameters
 center_x = 3;       % Center position (middle of 5x5 filter)
 center_y = 3;
-center_radius = 0.6;  % Small center
-surround_radius = 1.8*center_radius; % Larger surround
+center_radius = 1.2;  % Small center
+surround_radius = 2.2*center_radius; % Larger surround
 
 % Create the template
 template = createCenterSurroundTemplate(h, w, center_x, center_y, center_radius, surround_radius);

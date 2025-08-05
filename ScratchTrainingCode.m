@@ -136,15 +136,14 @@ end
 %CNN from scratch
 rng(1)
 layers = [
-    imageInputLayer([28 28 3], 'Name', 'input')
-    convolution2dLayer(5, 32, 'Name', 'conv1')      % Just 6 filters - easy to visualize
+    imageInputLayer([28 28 1], 'Name', 'input')
+    convolution2dLayer(3, 6, 'Name', 'conv1') 
     reluLayer('Name', 'relu1')
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
-    convolution2dLayer(3, 64, 'Name', 'conv2')  % Add this
-    reluLayer('Name', 'relu2')
-    maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool2')
     fullyConnectedLayer(10, 'Name', 'fc_output')
     softmaxLayer('Name', 'softmax')
+
+
 ];
 
 net=dlnetwork(layers);
@@ -156,47 +155,75 @@ imds_train=imageDatastore(trainPath,'IncludeSubfolders',true,'LabelSource','fold
 imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','foldernames');
 [imds_train_split, imds_val_split] = splitEachLabel(imds_train, 0.8, 'randomized');
 
-imds_train_resized = augmentedImageDatastore(exinputsize(1:2), imds_train_split);
-imds_test_resized = augmentedImageDatastore(exinputsize(1:2), imds_test);
-imds_val_resized = augmentedImageDatastore(exinputsize(1:2), imds_val_split);
+imds_train_resized = augmentedImageDatastore(exinputsize(1:2), imds_train_split,"ColorPreprocessing","rgb2gray");
+imds_test_resized = augmentedImageDatastore(exinputsize(1:2), imds_test,"ColorPreprocessing","rgb2gray");
+imds_val_resized = augmentedImageDatastore(exinputsize(1:2), imds_val_split,"ColorPreprocessing","rgb2gray");
 batchSize=64;
 maxEpochs=15;
-learningRate=1e-3;
+learningRate=1e-4;
 
-options=trainingOptions('adam','MiniBatchSize',batchSize, ...
+options=trainingOptions('sgdm','MiniBatchSize',batchSize, ...
     'MaxEpochs',maxEpochs, ...
     'InitialLearnRate',learningRate, 'Shuffle','every-epoch', ...
     'Verbose',true, ...
     'ValidationData',imds_val_resized, ...
     'ValidationFrequency',50,...
-    'ValidationPatience',20,...
+    'ValidationPatience',30,...
     'LearnRateSchedule','piecewise',...
     'LearnRateDropFactor',0.5,...
     'LearnRateDropPeriod',5,...
     'Plots','training-progress','Metrics','accuracy');
 %% Train
-sNetCIFAR = trainnet(imds_train_resized, net,"crossentropy",options);
+sNet3liteCIFAR4 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('scratchcifar.mat','sNetCIFAR')
+save('scratch3litecifar4.mat','sNet3liteCIFAR4')
 %% Evaluate
-scores=minibatchpredict(sNetCIFAR,imds_test_resized);
+scores=minibatchpredict(sNet3liteCIFAR4,imds_test_resized);
 classes=categories(imds_test.Labels);
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(sNetCIFAR,imds_test_resized,"accuracy")
+accuracy=testnet(sNet3liteCIFAR4,imds_test_resized,"accuracy")
 
 % Display confusion matrix
-figure;
-confusionchart(testlabels, predlabels);
+%figure;
+%confusionchart(testlabels, predlabels);
 
-title('Confusion Matrix');
+%title('Confusion Matrix');
 %% center surround score
-%load('scratchlitecifar.mat','sNetliteCIFAR');
-weights = sNetliteCIFARart.Layers(2).Weights;
+load('scratch3litecifar.mat','sNet3liteCIFAR');
+function final_score=corr2csscore(filter)
+    [h,w]=size(filter);
+    best_score=0;
+    center_radii = [0.6, 0.9, 1.2];
+    surround_ratios = [1.8, 2.2];
+    cx_range = 2:(w-1);  % Avoid edges
+    cy_range = 2:(h-1);
+
+    for center_r = center_radii
+        for surr_ratio = surround_ratios
+            surround_r=center_r*surr_ratio;
+            for cx = cx_range
+                for cy = cy_range
+                    template=createCenterSurroundTemplate(h,w,cx,cy,center_r,surround_r);
+                    c=corr2(template,filter);
+                    current_score=abs(c);
+
+                    if current_score>best_score
+                        best_score = current_score;
+                    end
+                end
+            end
+        end
+    end
+    final_score=best_score;
+end
+weights = sNet3liteCIFAR.Layers(2).Weights;
 num_filters=size(weights,4); %4th dimension of weights contains num filters
 cs_scores=zeros(1,num_filters);
 for i=1:num_filters
-    fprintf('Filter %d ',i);
     filter=weights(:,:,1,i);
-    cs_scores(i)=getCenterSurroundScore(filter);
+    cs_scores(i)=corr2csscore(filter);
+    fprintf('Filter %d: %.3f\n',i, cs_scores(i));
 end
+
+disp(strjoin(string(cs_scores), sprintf('\t')))
