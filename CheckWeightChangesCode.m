@@ -39,8 +39,8 @@ end
 %% 
 rng(1)
 layers = [
-    imageInputLayer([28 28 3], 'Name', 'input')
-    convolution2dLayer(3, 32, 'Name', 'conv1')      % Just 6 filters - easy to visualize
+    imageInputLayer([28 28 1], 'Name', 'input')
+    convolution2dLayer(5, 8, 'Name', 'conv1')      % Just 6 filters - easy to visualize
     reluLayer('Name', 'relu1')
     maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
     fullyConnectedLayer(10, 'Name', 'fc_output')
@@ -48,7 +48,7 @@ layers = [
 ];
 
 originalNet = dlnetwork(layers);
-load('scratchcifar.mat','sNetCIFAR');
+load('scratchfclitecifar3.mat','sNetfcliteCIFAR3');
 function visualizeLayerComparison(originalNet, trainedNet, layerNum)
     origLayer = originalNet.Layers(layerNum);
     newLayer = trainedNet.Layers(layerNum);
@@ -110,7 +110,7 @@ function visualizeLayerComparisonRGB(originalNet, trainedNet, layerNum)
         end
     end
 end
-visualizeLayerComparison(originalNet, sNet3liteCIFAR, 2)
+visualizeLayerComparison(originalNet, sNetfcliteCIFAR3, 2)
 %% debugging
 % Compare raw weight statistics
 before_weights = squeeze(originalNet.Layers(2).Weights);

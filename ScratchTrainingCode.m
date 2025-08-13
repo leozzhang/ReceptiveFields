@@ -136,10 +136,19 @@ end
 %CNN from scratch
 rng(1)
 layers = [
-    imageInputLayer([28 28 1], 'Name', 'input')
-    convolution2dLayer(3, 6, 'Name', 'conv1') 
+    imageInputLayer([32 32 1], 'Name', 'input')
+    %retina-net
+    convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same') 
     reluLayer('Name', 'relu1')
-    maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
+    convolution2dLayer(9, 2, 'Name', 'conv2', 'Padding', 'same')  %bottleneck
+    reluLayer('Name', 'relu2')
+    %vvs-net
+    convolution2dLayer(9,32,'Name', 'conv3', 'Padding', 'same')
+    reluLayer('Name', 'relu3')
+    convolution2dLayer(9,32,'Name','conv4', 'Padding', 'same')
+    reluLayer('Name','relu4')
+    fullyConnectedLayer(1024,'Name', 'fc1')
+    reluLayer('Name', 'relu5')
     fullyConnectedLayer(10, 'Name', 'fc_output')
     softmaxLayer('Name', 'softmax')
 
@@ -158,31 +167,30 @@ imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','folde
 imds_train_resized = augmentedImageDatastore(exinputsize(1:2), imds_train_split,"ColorPreprocessing","rgb2gray");
 imds_test_resized = augmentedImageDatastore(exinputsize(1:2), imds_test,"ColorPreprocessing","rgb2gray");
 imds_val_resized = augmentedImageDatastore(exinputsize(1:2), imds_val_split,"ColorPreprocessing","rgb2gray");
-batchSize=64;
-maxEpochs=15;
-learningRate=1e-4;
+batchSize=32;
+maxEpochs=20;
+learningRate=0.0005;
 
-options=trainingOptions('sgdm','MiniBatchSize',batchSize, ...
+options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'MaxEpochs',maxEpochs, ...
     'InitialLearnRate',learningRate, 'Shuffle','every-epoch', ...
     'Verbose',true, ...
     'ValidationData',imds_val_resized, ...
     'ValidationFrequency',50,...
-    'ValidationPatience',30,...
     'LearnRateSchedule','piecewise',...
     'LearnRateDropFactor',0.5,...
     'LearnRateDropPeriod',5,...
     'Plots','training-progress','Metrics','accuracy');
 %% Train
-sNet3liteCIFAR4 = trainnet(imds_train_resized, net,"crossentropy",options);
+retNet = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('scratch3litecifar4.mat','sNet3liteCIFAR4')
+save('retnet.mat','retNet')
 %% Evaluate
-scores=minibatchpredict(sNet3liteCIFAR4,imds_test_resized);
+scores=minibatchpredict(retNet,imds_test_resized);
 classes=categories(imds_test.Labels);
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(sNet3liteCIFAR4,imds_test_resized,"accuracy")
+accuracy=testnet(retNet,imds_test_resized,"accuracy")
 
 % Display confusion matrix
 %figure;
@@ -217,7 +225,7 @@ function final_score=corr2csscore(filter)
     end
     final_score=best_score;
 end
-weights = sNet3liteCIFAR.Layers(2).Weights;
+weights = retNet.Layers(4).Weights;
 num_filters=size(weights,4); %4th dimension of weights contains num filters
 cs_scores=zeros(1,num_filters);
 for i=1:num_filters

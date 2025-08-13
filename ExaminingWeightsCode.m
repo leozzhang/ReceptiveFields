@@ -1,7 +1,7 @@
 clear,clc
-load('scratchmnist.mat','scratchNet'); %load transfer learning network
+load('retnet.mat','retNet'); %load transfer learning network
 %trainedNet=imagePretrainedNetwork("googlenet"); %load pretrained network
-firstConvLayer=scratchNet.Layers(2);
+firstConvLayer=retNet.Layers(2);
 fprintf('Layer name: %s\n', firstConvLayer.Name); %check we have the right layer
 
 weights=firstConvLayer.Weights;
