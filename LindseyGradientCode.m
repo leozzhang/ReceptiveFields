@@ -96,7 +96,7 @@ sgtitle(sprintf('Receptive Fields (Lindsey Method) - %s', layerName));
 end
 
 
-
-visualizeFilters_LindseyMethod(retNet, "conv1", 32)
+load("retnet8.mat","retNet8")
+visualizeFilters_LindseyMethod(retNet8, "conv3", 12)
 
 %% 

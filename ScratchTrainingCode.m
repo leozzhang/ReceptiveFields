@@ -134,13 +134,13 @@ function cs_score = getCenterSurroundScore(filter)
 end
 
 %CNN from scratch
-rng(1)
+rng(2)
 layers = [
     imageInputLayer([32 32 1], 'Name', 'input')
     %retina-net
     convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same') 
     reluLayer('Name', 'relu1')
-    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same')  %bottleneck
+    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
     leakyReluLayer('Name', 'relu2')
     %vvs-net
     convolution2dLayer(9,32,'Name', 'conv3', 'Padding', 'same')
@@ -178,19 +178,19 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'ValidationData', imds_val_resized, ...
     'ValidationFrequency', 50, ...
     'ValidationPatience', 10, ...  % Stop early if overfitting
-    'L2Regularization', 1e-6, ...  % Continuous decay like their code
+    'L2Regularization', 1e-5, ...  
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-retNet = trainnet(imds_train_resized, net,"crossentropy",options);
+retNet8 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('retnet.mat','retNet')
+save('retnet8.mat','retNet8')
 %% Evaluate
-scores=minibatchpredict(retNet,imds_test_resized);
+scores=minibatchpredict(retNet8,imds_test_resized);
 classes=categories(imds_test.Labels);
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(retNet,imds_test_resized,"accuracy")
+accuracy=testnet(retNet8,imds_test_resized,"accuracy")
 
 % Display confusion matrix
 %figure;
@@ -225,7 +225,7 @@ function final_score=corr2csscore(filter)
     end
     final_score=best_score;
 end
-weights = retNet.Layers(4).Weights;
+weights = retNet2.Layers(4).Weights;
 num_filters=size(weights,4); %4th dimension of weights contains num filters
 cs_scores=zeros(1,num_filters);
 for i=1:num_filters
