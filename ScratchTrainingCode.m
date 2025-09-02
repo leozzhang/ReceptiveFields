@@ -136,30 +136,20 @@ end
 %CNN from scratch
 rng(2)
 layers = [
-    imageInputLayer([32 32 1], 'Name', 'input')
-    %retina-net
-    convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same') 
+    imageInputLayer([25 25 1], 'Name', 'input')
+    convolution2dLayer(5, 6, 'Name', 'conv1') 
     reluLayer('Name', 'relu1')
-    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
-    leakyReluLayer('Name', 'relu2')
-    %vvs-net
-    convolution2dLayer(9,32,'Name', 'conv3', 'Padding', 'same')
-    reluLayer('Name', 'relu3')
-    convolution2dLayer(9,32,'Name','conv4', 'Padding', 'same')
-    reluLayer('Name','relu4')
-    fullyConnectedLayer(1024,'Name', 'fc1')
-    reluLayer('Name', 'relu5')
-    fullyConnectedLayer(10, 'Name', 'fc_output')
+    maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
+    fullyConnectedLayer(2, 'Name', 'fc_output')
     softmaxLayer('Name', 'softmax')
-
 
 ];
 
 net=dlnetwork(layers);
 exinputsize=net.Layers(1).InputSize;
 
-trainPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\train';
-testPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\test';
+trainPath='C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train';
+testPath='C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\test';
 imds_train=imageDatastore(trainPath,'IncludeSubfolders',true,'LabelSource','foldernames');
 imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','foldernames');
 [imds_train_split, imds_val_split] = splitEachLabel(imds_train, 0.8, 'randomized');
@@ -182,21 +172,22 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-retNet8 = trainnet(imds_train_resized, net,"crossentropy",options);
+RFClassifyNet = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('retnet8.mat','retNet8')
+save('rfclassifynet.mat','RFClassifyNet')
 %% Evaluate
-scores=minibatchpredict(retNet8,imds_test_resized);
+scores=minibatchpredict(RFClassifyNet,imds_test_resized);
 classes=categories(imds_test.Labels);
+scores(1)
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(retNet8,imds_test_resized,"accuracy")
+accuracy=testnet(RFClassifyNet,imds_test_resized,"accuracy")
 
 % Display confusion matrix
-%figure;
-%confusionchart(testlabels, predlabels);
+figure;
+confusionchart(testlabels, predlabels);
 
-%title('Confusion Matrix');
+title('Confusion Matrix');
 %% center surround score
 load('scratch3litecifar.mat','sNet3liteCIFAR');
 function final_score=corr2csscore(filter)

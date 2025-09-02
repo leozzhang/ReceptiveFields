@@ -2,7 +2,7 @@ function config = getOrientedRFConfig() % oriented generator parameters
     config.image_size = 25;
     config.center_position_range = [8, 17];  % min, max for both x and y
     config.orientation_steps = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5];  % degrees
-    config.frequency_range = [1.0, 5.0];  % cycles across the RF
+    config.frequency_range = [3.0, 10.0];  % cycles across the RF
     config.sigma_x_range = [1.5, 3.5];  % width of Gaussian envelope (along bars)
     config.sigma_y_ratio_range = [2.0, 4.0];  % sigma_y = sigma_x * ratio (elongated)
     config.amplitude_range = [0.5, 1.5];  % strength of response
@@ -128,25 +128,57 @@ function [rf, params] = generateSingleOriented(varargin)
 end
 
 function rf_noisy = addOrientedNoise(rf, varargin)
-    % Add Gaussian noise to oriented receptive field
+    % Add multiple types of random noise/distortions to oriented RF
     
     p = inputParser;
     config = getOrientedRFConfig();
     addParameter(p, 'noise_level', [], @isnumeric);
     addParameter(p, 'config', config, @isstruct);
+    addParameter(p, 'gaussian_noise', 0.05, @isnumeric);  % Max Gaussian noise
+    addParameter(p, 'salt_pepper', 0, @isnumeric);    % Max salt & pepper
+    addParameter(p, 'blur_amount', [0, 0.8], @isnumeric); % Random blur range
+    addParameter(p, 'contrast_range', [0.8, 1.2], @isnumeric); % Contrast variation
     parse(p, varargin{:});
     
-    if isempty(p.Results.noise_level)
+    rf_noisy = rf;
+    
+    % Original noise (keep this for backward compatibility)
+    if ~isempty(p.Results.noise_level)
+        noise_level = p.Results.noise_level;
+    else
         range = p.Results.config.noise_level_range;
         noise_level = range(1) + (range(2) - range(1)) * rand();
-    else
-        noise_level = p.Results.noise_level;
+    end
+    signal_strength = std(rf(:));
+    rf_noisy = rf_noisy + randn(size(rf)) * noise_level * signal_strength;
+    
+    % NEW: Additional noise types (same as center-surround)
+    % 1. Extra Gaussian noise
+    if p.Results.gaussian_noise > 0
+        extra_noise = p.Results.gaussian_noise * rand();
+        rf_noisy = rf_noisy + randn(size(rf)) * extra_noise;
     end
     
-    signal_strength = std(rf(:));
-    noise = randn(size(rf)) * noise_level * signal_strength;
+    % 2. Salt and pepper noise
+    if p.Results.salt_pepper > 0
+        sp_level = p.Results.salt_pepper * rand();
+        rf_noisy = imnoise(rf_noisy, 'salt & pepper', sp_level);
+    end
     
-    rf_noisy = rf + noise;
+    % 3. Random blur
+    blur_range = p.Results.blur_amount;
+    blur_sigma = blur_range(1) + (blur_range(2) - blur_range(1)) * rand();
+    if blur_sigma > 0
+        rf_noisy = imgaussfilt(rf_noisy, blur_sigma);
+    end
+    
+    % 4. Random contrast
+    contrast_range = p.Results.contrast_range;
+    contrast_factor = contrast_range(1) + (contrast_range(2) - contrast_range(1)) * rand();
+    rf_noisy = rf_noisy * contrast_factor;
+    
+    % Keep values reasonable
+    rf_noisy = max(-3, min(3, rf_noisy));
 end
 
 function rf_normalized = normalizeOrientedFilter(rf)
@@ -336,6 +368,8 @@ function [rf, params] = generateSingleCenterSurround(varargin)
         surround_val = -p.Results.config.surround_value;
     end
     rf(surround_mask) = surround_val * amplitude;
+
+    rf = imgaussfilt(rf, 1.0);
     
     % Store parameters
     params = struct();
@@ -349,25 +383,57 @@ function [rf, params] = generateSingleCenterSurround(varargin)
 end
 
 function rf_noisy = addNoise(rf, varargin)
-    % Add Gaussian noise to receptive field
+    % Add multiple types of random noise/distortions to center-surround RF
     
     p = inputParser;
     config = getRFConfig();
     addParameter(p, 'noise_level', [], @isnumeric);
     addParameter(p, 'config', config, @isstruct);
+    addParameter(p, 'gaussian_noise', 0.05, @isnumeric);  % Max Gaussian noise
+    addParameter(p, 'salt_pepper', 0, @isnumeric);    % Max salt & pepper
+    addParameter(p, 'blur_amount', [0, 0.8], @isnumeric); % Random blur range
+    addParameter(p, 'contrast_range', [0.8, 1.2], @isnumeric); % Contrast variation
     parse(p, varargin{:});
     
-    if isempty(p.Results.noise_level)
+    rf_noisy = rf;
+    
+    % Original noise (keep this for backward compatibility)
+    if ~isempty(p.Results.noise_level)
+        noise_level = p.Results.noise_level;
+    else
         range = p.Results.config.noise_level_range;
         noise_level = range(1) + (range(2) - range(1)) * rand();
-    else
-        noise_level = p.Results.noise_level;
+    end
+    signal_strength = std(rf(:));
+    rf_noisy = rf_noisy + randn(size(rf)) * noise_level * signal_strength;
+    
+    % NEW: Additional noise types
+    % 1. Extra Gaussian noise
+    if p.Results.gaussian_noise > 0
+        extra_noise = p.Results.gaussian_noise * rand();
+        rf_noisy = rf_noisy + randn(size(rf)) * extra_noise;
     end
     
-    signal_strength = std(rf(:));
-    noise = randn(size(rf)) * noise_level * signal_strength;
+    % 2. Salt and pepper noise
+    if p.Results.salt_pepper > 0
+        sp_level = p.Results.salt_pepper * rand();
+        rf_noisy = imnoise(rf_noisy, 'salt & pepper', sp_level);
+    end
     
-    rf_noisy = rf + noise;
+    % 3. Random blur
+    blur_range = p.Results.blur_amount;
+    blur_sigma = blur_range(1) + (blur_range(2) - blur_range(1)) * rand();
+    if blur_sigma > 0
+        rf_noisy = imgaussfilt(rf_noisy, blur_sigma);
+    end
+    
+    % 4. Random contrast
+    contrast_range = p.Results.contrast_range;
+    contrast_factor = contrast_range(1) + (contrast_range(2) - contrast_range(1)) * rand();
+    rf_noisy = rf_noisy * contrast_factor;
+    
+    % Keep values reasonable
+    rf_noisy = max(-3, min(3, rf_noisy));
 end
 
 function rf_normalized = normalizeFilter(rf)
@@ -589,4 +655,22 @@ function img_normalized = normalizeForPNG(img)
     end
 end
 
-saveRFDataset(50,50,'rf_test_dataset', 'split_train_test', true)
+saveRFDataset(500,500,'rf_dataset500', 'split_train_test', true)
+%% 
+% Re-examine your training data
+[cs_batch, ~] = generateBatch(5, 'visualize', true);  % Force visualization
+[or_batch, ~] = generateOrientedBatch(5, 'visualize', true);
+
+% Check if they actually look different
+figure;
+for i = 1:3
+    subplot(2, 3, i);
+    imagesc(squeeze(cs_batch(i,:,:))); 
+    colormap gray; axis off;
+    title('Generated CS');
+    
+    subplot(2, 3, i+3);
+    imagesc(squeeze(or_batch(i,:,:))); 
+    colormap gray; axis off;
+    title('Generated OR');
+end

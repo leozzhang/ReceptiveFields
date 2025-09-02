@@ -137,25 +137,57 @@ function [rf, params] = generateSingleOriented(varargin)
 end
 
 function rf_noisy = addOrientedNoise(rf, varargin)
-    % Add Gaussian noise to oriented receptive field
+    % Add multiple types of random noise/distortions to oriented RF
     
     p = inputParser;
     config = getOrientedRFConfig();
     addParameter(p, 'noise_level', [], @isnumeric);
     addParameter(p, 'config', config, @isstruct);
+    addParameter(p, 'gaussian_noise', 0.05, @isnumeric);  % Max Gaussian noise
+    addParameter(p, 'salt_pepper', 0, @isnumeric);    % Max salt & pepper
+    addParameter(p, 'blur_amount', [0, 0.8], @isnumeric); % Random blur range
+    addParameter(p, 'contrast_range', [0.8, 1.2], @isnumeric); % Contrast variation
     parse(p, varargin{:});
     
-    if isempty(p.Results.noise_level)
+    rf_noisy = rf;
+    
+    % Original noise (keep this for backward compatibility)
+    if ~isempty(p.Results.noise_level)
+        noise_level = p.Results.noise_level;
+    else
         range = p.Results.config.noise_level_range;
         noise_level = range(1) + (range(2) - range(1)) * rand();
-    else
-        noise_level = p.Results.noise_level;
+    end
+    signal_strength = std(rf(:));
+    rf_noisy = rf_noisy + randn(size(rf)) * noise_level * signal_strength;
+    
+    % NEW: Additional noise types (same as center-surround)
+    % 1. Extra Gaussian noise
+    if p.Results.gaussian_noise > 0
+        extra_noise = p.Results.gaussian_noise * rand();
+        rf_noisy = rf_noisy + randn(size(rf)) * extra_noise;
     end
     
-    signal_strength = std(rf(:));
-    noise = randn(size(rf)) * noise_level * signal_strength;
+    % 2. Salt and pepper noise
+    if p.Results.salt_pepper > 0
+        sp_level = p.Results.salt_pepper * rand();
+        rf_noisy = imnoise(rf_noisy, 'salt & pepper', sp_level);
+    end
     
-    rf_noisy = rf + noise;
+    % 3. Random blur
+    blur_range = p.Results.blur_amount;
+    blur_sigma = blur_range(1) + (blur_range(2) - blur_range(1)) * rand();
+    if blur_sigma > 0
+        rf_noisy = imgaussfilt(rf_noisy, blur_sigma);
+    end
+    
+    % 4. Random contrast
+    contrast_range = p.Results.contrast_range;
+    contrast_factor = contrast_range(1) + (contrast_range(2) - contrast_range(1)) * rand();
+    rf_noisy = rf_noisy * contrast_factor;
+    
+    % Keep values reasonable
+    rf_noisy = max(-3, min(3, rf_noisy));
 end
 
 function rf_normalized = normalizeOrientedFilter(rf)

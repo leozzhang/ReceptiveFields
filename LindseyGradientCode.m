@@ -97,6 +97,59 @@ end
 
 
 load("retnet8.mat","retNet8")
-visualizeFilters_LindseyMethod(retNet8, "conv3", 12)
+visualizeFilters_LindseyMethod(retNet8, "conv2", 1)
 
+%% Classify and softmax score
+% Extract RFs from your trained network
+load("retnet8.mat","retNet8")
+net = retNet8;
+layerName = "conv4";
+numFilters = 32;  % or however many you want to classify
+
+% Extract all RFs as arrays
+rfs = [];
+for i = 1:numFilters
+    rf = computeFilterRF_LindseyMethod(net, layerName, i, 'InputSize', [32, 32, 1]);
+    
+    % Resize from 32x32 to 25x25 to match your classifier
+    rf_resized = imresize(rf, [25, 25]);
+    
+    % Store in batch format
+    rfs(i, :, :) = rf_resized;
+end
+
+% Now classify all your CNN filters
+for i = 1:numFilters
+    single_rf = squeeze(rfs(i, :, :));
+    scores = minibatchpredict(RFClassifyNet, single_rf);
+    predicted_label = scores2label(scores, ["center_surround", "oriented"]);
+    fprintf('Filter %d: %s (CS: %.3f, OR: %.3f)\n', i, predicted_label, scores(1), scores(2));
+end
 %% 
+
+%noise_img = rand(25, 25);  % Random values 0-1
+
+%scores = minibatchpredict(RFClassifyNet, noise_img);
+%fprintf('Random noise: CS=%.3f, OR=%.3f\n', scores(1), scores(2));
+
+% On your training data
+cs_img = imread('C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0001.png');
+or_img = imread('C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\oriented\or_train_0001.png');
+
+% Convert to double for stats
+cs_img = double(cs_img);
+or_img = double(or_img);
+
+fprintf('CS: mean=%.2f, std=%.2f\n', mean(cs_img(:)), std(cs_img(:)));
+fprintf('OR: mean=%.2f, std=%.2f\n', mean(or_img(:)), std(or_img(:)));
+
+% On your CNN filters
+cnn_rf = computeFilterRF_LindseyMethod(retNet8, "conv3", 1);
+
+% Resize and normalize to 0–255 range (stay in double)
+cnn_rf_resized = imresize(cnn_rf, [25, 25]);
+cnn_rf_norm = (cnn_rf_resized - min(cnn_rf_resized(:))) / ...
+              (max(cnn_rf_resized(:)) - min(cnn_rf_resized(:)));
+cnn_rf_double = 255 * cnn_rf_norm;
+
+fprintf('CNN: mean=%.2f, std=%.2f\n', mean(cnn_rf_double(:)), std(cnn_rf_double(:)));
