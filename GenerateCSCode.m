@@ -204,9 +204,8 @@ function [batch, params_list] = generateBatch(n_samples, varargin)
         rf = addNoise(rf, 'config', p.Results.config);
         
         % Normalize if specified
-        if p.Results.config.normalize_energy
-            rf = normalizeFilter(rf);
-        end
+        rf = (rf - min(rf(:))) / (max(rf(:)) - min(rf(:)));  % Scale to [0,1]
+        rf = (rf - 0.5) * 2;  % Center around 0, range [-1, 1]
         
         batch(i, :, :) = rf;
         params_list{i} = params;

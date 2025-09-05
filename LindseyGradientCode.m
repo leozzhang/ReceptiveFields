@@ -102,54 +102,61 @@ visualizeFilters_LindseyMethod(retNet8, "conv2", 1)
 %% Classify and softmax score
 % Extract RFs from your trained network
 load("retnet8.mat","retNet8")
+load("rfclassifynet.mat","RFClassifyNet")
 net = retNet8;
-layerName = "conv4";
-numFilters = 32;  % or however many you want to classify
+layerName = "conv2";
+numFilters = 1;  % or however many you want to classify
+
+% Map each layer name to its receptive field size
+rfSizes = containers.Map( ...
+    {'conv1','conv2','conv3','conv4'}, ...
+    [9, 17, 25, 33]);
 
 % Extract all RFs as arrays
-rfs = [];
+rfs = zeros(numFilters, 25, 25);  % final size for classifier
+
 for i = 1:numFilters
     rf = computeFilterRF_LindseyMethod(net, layerName, i, 'InputSize', [32, 32, 1]);
-    
-    % Resize from 32x32 to 25x25 to match your classifier
-    rf_resized = imresize(rf, [25, 25]);
-    
-    % Store in batch format
+
+    % Get receptive field size for this layer
+    cropSize = rfSizes(layerName);
+
+    % Crop center patch of size cropSize × cropSize
+    center = floor(size(rf,1)/2) + 1;
+    half = floor(cropSize/2);
+    rf_cropped = rf(center-half:center+half, center-half:center+half);
+
+    % Resize to 25×25 for classifier
+    rf_resized = imresize(rf_cropped, [25, 25]);
+
+    % Store in batch
     rfs(i, :, :) = rf_resized;
 end
 
 % Now classify all your CNN filters
 for i = 1:numFilters
     single_rf = squeeze(rfs(i, :, :));
-    scores = minibatchpredict(RFClassifyNet, single_rf);
+    
+    % PREPROCESS to match training data distribution
+    % Convert to same format as your training data
+    single_rf_norm = (single_rf - mean(single_rf(:))) / std(single_rf(:));  % Z-score
+    single_rf_scaled = single_rf_norm * 20 + 150;  % Match training: std=20, mean=150
+    single_rf_final = uint8(max(0, min(255, single_rf_scaled)));  % Convert to uint8
+    
+    scores = minibatchpredict(RFClassifyNet, single_rf_final);
     predicted_label = scores2label(scores, ["center_surround", "oriented"]);
     fprintf('Filter %d: %s (CS: %.3f, OR: %.3f)\n', i, predicted_label, scores(1), scores(2));
 end
 %% 
+% Create simple test patterns
+blank = ones(25, 25) * 150;  % Solid gray
+circle = blank; circle(8:17, 8:17) = 200;  % White square
+lines = blank; lines(:, 12:13) = 200;  % Vertical lines
 
-%noise_img = rand(25, 25);  % Random values 0-1
+scores_blank = minibatchpredict(RFClassifyNet, uint8(blank));
+scores_circle = minibatchpredict(RFClassifyNet, uint8(circle));
+scores_lines = minibatchpredict(RFClassifyNet, uint8(lines));
 
-%scores = minibatchpredict(RFClassifyNet, noise_img);
-%fprintf('Random noise: CS=%.3f, OR=%.3f\n', scores(1), scores(2));
-
-% On your training data
-cs_img = imread('C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0001.png');
-or_img = imread('C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\oriented\or_train_0001.png');
-
-% Convert to double for stats
-cs_img = double(cs_img);
-or_img = double(or_img);
-
-fprintf('CS: mean=%.2f, std=%.2f\n', mean(cs_img(:)), std(cs_img(:)));
-fprintf('OR: mean=%.2f, std=%.2f\n', mean(or_img(:)), std(or_img(:)));
-
-% On your CNN filters
-cnn_rf = computeFilterRF_LindseyMethod(retNet8, "conv3", 1);
-
-% Resize and normalize to 0–255 range (stay in double)
-cnn_rf_resized = imresize(cnn_rf, [25, 25]);
-cnn_rf_norm = (cnn_rf_resized - min(cnn_rf_resized(:))) / ...
-              (max(cnn_rf_resized(:)) - min(cnn_rf_resized(:)));
-cnn_rf_double = 255 * cnn_rf_norm;
-
-fprintf('CNN: mean=%.2f, std=%.2f\n', mean(cnn_rf_double(:)), std(cnn_rf_double(:)));
+fprintf('Blank: CS=%.3f, OR=%.3f\n', scores_blank(1), scores_blank(2));
+fprintf('Circle: CS=%.3f, OR=%.3f\n', scores_circle(1), scores_circle(2));
+fprintf('Lines: CS=%.3f, OR=%.3f\n', scores_lines(1), scores_lines(2));

@@ -2,8 +2,8 @@ function config = getOrientedRFConfig() % oriented generator parameters
     config.image_size = 25;
     config.center_position_range = [8, 17];  % min, max for both x and y
     config.orientation_steps = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5];  % degrees
-    config.frequency_range = [3.0, 10.0];  % cycles across the RF
-    config.sigma_x_range = [1.5, 3.5];  % width of Gaussian envelope (along bars)
+    config.frequency_range = [5.0, 15.0];  % cycles across the RF
+    config.sigma_x_range = [2, 6];  % width of Gaussian envelope (along bars)
     config.sigma_y_ratio_range = [2.0, 4.0];  % sigma_y = sigma_x * ratio (elongated)
     config.amplitude_range = [0.5, 1.5];  % strength of response
     config.noise_level_range = [0.0, 0.2];  % noise as fraction of signal
@@ -104,15 +104,59 @@ function [rf, params] = generateSingleOriented(varargin)
     X_rot = X_centered * cos(theta) + Y_centered * sin(theta);
     Y_rot = -X_centered * sin(theta) + Y_centered * cos(theta);
     
-    % Create Gaussian envelope (elliptical)
+   % Create Gaussian envelope (elliptical)
     gaussian = exp(-(X_rot.^2 / (2 * sigma_x^2) + Y_rot.^2 / (2 * sigma_y^2)));
     
-    % Create sinusoidal grating
+    % Create MORE REALISTIC grating (less perfectly linear)
     wavelength = image_size / frequency;  % pixels per cycle
-    grating = sin(2 * pi * X_rot / wavelength + deg2rad(phase));
     
-    % Combine Gaussian envelope with grating
-    rf = amplitude * gaussian .* grating;
+    % 1. Add frequency variation across space (less uniform)
+    freq_variation = 1 + 0.2 * sin(2 * pi * Y_rot / (wavelength * 2));  % Slight freq changes
+    local_wavelength = wavelength ./ freq_variation;
+    
+    % 2. Add slight curvature to bars (less perfectly straight)
+    curvature = 0.1 * (X_rot.^2) / (image_size^2);  % Slight curvature
+    curved_phase = deg2rad(phase) + curvature;
+    
+    % 3. Create grating with variations
+    grating = sin(2 * pi * X_rot ./ local_wavelength + curved_phase);
+    
+    % 4. Add local orientation jitter (bars not perfectly parallel)
+    if rand() < 0.4  % 40% chance of orientation jitter
+        jitter_strength = 0.05;
+        orientation_noise = jitter_strength * randn(size(X_rot));
+        
+        % Apply local rotations
+        X_jitter = X_rot .* cos(orientation_noise) - Y_rot .* sin(orientation_noise);
+        grating = sin(2 * pi * X_jitter ./ local_wavelength + curved_phase);
+    end
+    
+    % 5. Make Gaussian envelope less perfectly elliptical
+    envelope_noise = 0.1 * randn(size(gaussian));
+    gaussian_irregular = gaussian + envelope_noise;
+    gaussian_irregular = max(0, gaussian_irregular);  % Keep positive
+    
+    % Combine irregular envelope with varied grating
+    rf = amplitude * gaussian_irregular .* grating;
+    
+    % 6. Add some "breaks" in the bars occasionally
+    if rand() < 0.3  % 30% chance
+        num_breaks = randi([1, 2]);
+        for brk = 1:num_breaks
+            break_x = randi([5, image_size-4]);
+            break_y = randi([5, image_size-4]);
+            break_size = randi([2, 4]);
+            
+            % Create small circular "break" in the pattern
+            break_distances = sqrt((X - break_x).^2 + (Y - break_y).^2);
+            break_mask = break_distances <= break_size;
+            rf(break_mask) = rf(break_mask) * 0.3;  % Reduce strength in break area
+        end
+    end
+    
+    % 7. Add texture noise to break up perfect sinusoids
+    texture_noise = 0.1 * randn(size(rf));
+    rf = rf + texture_noise;
     
     % Store parameters used
     params = struct();
@@ -210,9 +254,8 @@ function [batch, params_list] = generateOrientedBatch(n_samples, varargin)
         rf = addOrientedNoise(rf, 'config', p.Results.config);
         
         % Normalize if specified
-        if p.Results.config.normalize_energy
-            rf = normalizeOrientedFilter(rf);
-        end
+        rf = (rf - min(rf(:))) / (max(rf(:)) - min(rf(:)));  % Scale to [0,1]
+        rf = (rf - 0.5) * 2;  % Center around 0, range [-1, 1]
         
         batch(i, :, :) = rf;
         params_list{i} = params;
@@ -345,8 +388,25 @@ function [rf, params] = generateSingleCenterSurround(varargin)
     % Create coordinate grids
     [X, Y] = meshgrid(1:image_size, 1:image_size);
     
-    % Calculate distances from center
-    distances = sqrt((X - center_x).^2 + (Y - center_y).^2);
+    % Make slightly oval instead of perfect circle
+    % Add random elliptical distortion
+    ellipse_ratio = 0.7 + 0.6 * rand();  % Ratio between 0.7 and 1.3
+    ellipse_angle = rand() * 2 * pi;  % Random orientation
+    
+    % Apply elliptical transformation
+    cos_angle = cos(ellipse_angle);
+    sin_angle = sin(ellipse_angle);
+    
+    % Rotate coordinates
+    X_rot = (X - center_x) * cos_angle + (Y - center_y) * sin_angle;
+    Y_rot = -(X - center_x) * sin_angle + (Y - center_y) * cos_angle;
+    
+    % Apply elliptical scaling
+    X_scaled = X_rot;
+    Y_scaled = Y_rot / ellipse_ratio;  % Compress/stretch one axis
+    
+    % Calculate elliptical distances
+    distances = sqrt(X_scaled.^2 + Y_scaled.^2);
     
     % Initialize RF
     rf = zeros(image_size, image_size);
@@ -368,8 +428,57 @@ function [rf, params] = generateSingleCenterSurround(varargin)
         surround_val = -p.Results.config.surround_value;
     end
     rf(surround_mask) = surround_val * amplitude;
-
-    rf = imgaussfilt(rf, 1.0);
+    
+    % Make it less blob-like and more realistic
+    % 1. Add irregular edges by varying the radii slightly
+    [H, W] = size(rf);
+    [X, Y] = meshgrid(1:W, 1:H);
+    angle = atan2(Y - center_y, X - center_x);
+    
+    % Add radial irregularity (make edges less perfect)
+    irregularity = 0.3 * sin(6 * angle) + 0.2 * sin(4 * angle); % Wavy edges
+    center_radius_varied = center_radius + irregularity;
+    surround_radius_varied = surround_radius + irregularity;
+    
+    % Use the elliptical distances (don't recalculate circular distances)
+    center_mask_irreg = distances <= center_radius_varied;
+    surround_mask_irreg = (distances > center_radius_varied) & (distances <= surround_radius_varied);
+    
+    % Apply the irregular pattern
+    rf = zeros(H, W);
+    if is_on_center
+        center_val = p.Results.config.center_value;
+        surround_val = p.Results.config.surround_value;
+    else
+        center_val = -p.Results.config.center_value;
+        surround_val = -p.Results.config.surround_value;
+    end
+    
+    rf(center_mask_irreg) = center_val * amplitude;
+    rf(surround_mask_irreg) = surround_val * amplitude;
+    
+    % 2. Add some texture/noise to break up smooth regions
+    texture_noise = 0.15 * randn(size(rf));
+    rf = rf + texture_noise;
+    
+    % 3. Light blur to soften harsh edges but keep structure
+    rf = imgaussfilt(rf, 0.5);  % Less blur than before
+    
+    % 4. Add some random "holes" or "bumps" occasionally
+    if rand() < 0.3  % 30% chance
+        num_spots = randi([1, 3]);
+        for spot = 1:num_spots
+            spot_x = randi([3, W-2]);
+            spot_y = randi([3, H-2]);
+            spot_size = randi([1, 2]);
+            spot_strength = 0.3 * (rand() - 0.5) * amplitude;
+            
+            % Add small random spots
+            spot_distances = sqrt((X - spot_x).^2 + (Y - spot_y).^2);
+            spot_mask = spot_distances <= spot_size;
+            rf(spot_mask) = rf(spot_mask) + spot_strength;
+        end
+    end
     
     % Store parameters
     params = struct();
@@ -469,9 +578,8 @@ function [batch, params_list] = generateBatch(n_samples, varargin)
         rf = addNoise(rf, 'config', p.Results.config);
         
         % Normalize if specified
-        if p.Results.config.normalize_energy
-            rf = normalizeFilter(rf);
-        end
+        rf = (rf - min(rf(:))) / (max(rf(:)) - min(rf(:)));  % Scale to [0,1]
+        rf = (rf - 0.5) * 2;  % Center around 0, range [-1, 1]
         
         batch(i, :, :) = rf;
         params_list{i} = params;
@@ -642,17 +750,20 @@ function saveRFDataset(n_center_surround, n_oriented, base_folder, varargin)
 end
 
 function img_normalized = normalizeForPNG(img)
-    % Normalize RF image for PNG saving (0-255 grayscale)
+    % Force all images to have the same distribution
+    % Target: mean = 127.5, std = 40 (or whatever you choose)
     
-    % Shift to all positive values
-    img_shifted = img - min(img(:));
+    target_mean = 150;
+    target_std = 20;
     
-    % Scale to 0-255
-    if max(img_shifted(:)) > 0
-        img_normalized = uint8(255 * img_shifted / max(img_shifted(:)));
-    else
-        img_normalized = uint8(zeros(size(img)));
-    end
+    % Z-score normalize
+    img_zscore = (img - mean(img(:))) / std(img(:));
+    
+    % Scale to target distribution
+    img_scaled = img_zscore * target_std + target_mean;
+    
+    % Clip to [0, 255]
+    img_normalized = uint8(max(0, min(255, img_scaled)));
 end
 
 saveRFDataset(500,500,'rf_dataset500', 'split_train_test', true)

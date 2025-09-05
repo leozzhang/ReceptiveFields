@@ -136,12 +136,33 @@ end
 %CNN from scratch
 rng(2)
 layers = [
-    imageInputLayer([25 25 1], 'Name', 'input')
-    convolution2dLayer(5, 6, 'Name', 'conv1') 
-    reluLayer('Name', 'relu1')
-    maxPooling2dLayer(2, 'Stride', 2, 'Name', 'pool1')
-    fullyConnectedLayer(2, 'Name', 'fc_output')
-    softmaxLayer('Name', 'softmax')
+        imageInputLayer([25 25 1], 'Name', 'input', 'Normalization', 'none')
+        convolution2dLayer(5, 16, 'Name', 'conv1', 'Padding', 'same', ...
+                          'WeightsInitializer', 'he')
+        batchNormalizationLayer('Name', 'bn1')
+        reluLayer('Name', 'relu1')
+        convolution2dLayer(5, 32, 'Name', 'conv2', 'Padding', 'same', ...
+                          'WeightsInitializer', 'he')
+        batchNormalizationLayer('Name', 'bn2')
+        reluLayer('Name', 'relu2')
+        maxPooling2dLayer(2, 'Name', 'pool1', 'Stride', 2)  
+        convolution2dLayer(3, 64, 'Name', 'conv3', 'Padding', 'same', ...
+                          'WeightsInitializer', 'he')
+        batchNormalizationLayer('Name', 'bn3')
+        reluLayer('Name', 'relu3')
+        
+        convolution2dLayer(3, 64, 'Name', 'conv4', 'Padding', 'same', ...
+                          'WeightsInitializer', 'he')
+        batchNormalizationLayer('Name', 'bn4')
+        reluLayer('Name', 'relu4')
+        averagePooling2dLayer(2, 'Name', 'pool2', 'Stride', 2)
+        flattenLayer('Name', 'flatten')
+        dropoutLayer(0.3, 'Name', 'dropout')
+        fullyConnectedLayer(32, 'Name', 'fc1', 'WeightsInitializer', 'he')
+        reluLayer('Name', 'relu_fc')
+        fullyConnectedLayer(2, 'Name', 'fc_output')
+        softmaxLayer('Name', 'softmax')
+
 
 ];
 
