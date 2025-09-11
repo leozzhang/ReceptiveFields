@@ -133,34 +133,40 @@ function cs_score = getCenterSurroundScore(filter)
     cs_score = score;
 end
 
-%CNN from scratch
+%set conv weights as previously trained network weights
+load("retnet8.mat","retNet8")
+genetic_conv1_weights = retNet8.Layers(2).Weights;
+genetic_conv1_bias = retNet8.Layers(2).Bias;
+genetic_conv2_weights = retNet8.Layers(4).Weights;  
+genetic_conv2_bias = retNet8.Layers(4).Bias;
+%load optimized reverse engineered weights
+load("optimized_conv2_weights.mat","optimized_conv2_weights")
+
 rng(2)
 layers = [
-        imageInputLayer([25 25 1], 'Name', 'input', 'Normalization', 'none')
-        convolution2dLayer(5, 16, 'Name', 'conv1', 'Padding', 'same', ...
-                          'WeightsInitializer', 'he')
-        batchNormalizationLayer('Name', 'bn1')
-        reluLayer('Name', 'relu1')
-        convolution2dLayer(5, 32, 'Name', 'conv2', 'Padding', 'same', ...
-                          'WeightsInitializer', 'he')
-        batchNormalizationLayer('Name', 'bn2')
-        reluLayer('Name', 'relu2')
-        maxPooling2dLayer(2, 'Name', 'pool1', 'Stride', 2)  
-        convolution2dLayer(3, 64, 'Name', 'conv3', 'Padding', 'same', ...
-                          'WeightsInitializer', 'he')
-        batchNormalizationLayer('Name', 'bn3')
-        reluLayer('Name', 'relu3')
+        imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')  % 32x32 like retNet8
         
-        convolution2dLayer(3, 64, 'Name', 'conv4', 'Padding', 'same', ...
-                          'WeightsInitializer', 'he')
-        batchNormalizationLayer('Name', 'bn4')
+        % GENETIC layers from retNet8
+        convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...     % 9x9 like retNet8
+                          'Weights', genetic_conv1_weights, ...
+                          'Bias', genetic_conv1_bias, ...
+                          'WeightLearnRateFactor', 1, 'BiasLearnRateFactor', 0)
+        reluLayer('Name', 'relu1')
+        
+        convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
+                          'Weights', optimized_conv2_weights, ...
+                          'Bias', genetic_conv2_bias, ...
+                          'WeightLearnRateFactor', 0, 'BiasLearnRateFactor', 0)
+        leakyReluLayer('Name', 'relu2')
+        
+        % TRAINABLE layers (experience-dependent)
+        convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+        reluLayer('Name', 'relu3')
+        convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
         reluLayer('Name', 'relu4')
-        averagePooling2dLayer(2, 'Name', 'pool2', 'Stride', 2)
-        flattenLayer('Name', 'flatten')
-        dropoutLayer(0.3, 'Name', 'dropout')
-        fullyConnectedLayer(32, 'Name', 'fc1', 'WeightsInitializer', 'he')
-        reluLayer('Name', 'relu_fc')
-        fullyConnectedLayer(2, 'Name', 'fc_output')
+        fullyConnectedLayer(1024, 'Name', 'fc1')
+        reluLayer('Name', 'relu5')
+        fullyConnectedLayer(10, 'Name', 'fc_output')
         softmaxLayer('Name', 'softmax')
 
 
@@ -169,8 +175,8 @@ layers = [
 net=dlnetwork(layers);
 exinputsize=net.Layers(1).InputSize;
 
-trainPath='C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train';
-testPath='C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\test';
+trainPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\train';
+testPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\test';
 imds_train=imageDatastore(trainPath,'IncludeSubfolders',true,'LabelSource','foldernames');
 imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','foldernames');
 [imds_train_split, imds_val_split] = splitEachLabel(imds_train, 0.8, 'randomized');
@@ -193,16 +199,16 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-RFClassifyNet = trainnet(imds_train_resized, net,"crossentropy",options);
+genNet8 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('rfclassifynet.mat','RFClassifyNet')
+save('gennet8.mat','genNet8')
 %% Evaluate
-scores=minibatchpredict(RFClassifyNet,imds_test_resized);
+scores=minibatchpredict(genNet8,imds_test_resized);
 classes=categories(imds_test.Labels);
 scores(1)
 predlabels=scores2label(scores,classes);
 testlabels=imds_test.Labels;
-accuracy=testnet(RFClassifyNet,imds_test_resized,"accuracy")
+accuracy=testnet(genNet8,imds_test_resized,"accuracy")
 
 % Display confusion matrix
 figure;

@@ -96,9 +96,8 @@ sgtitle(sprintf('Receptive Fields (Lindsey Method) - %s', layerName));
 end
 
 
-load("retnet8.mat","retNet8")
-visualizeFilters_LindseyMethod(retNet8, "conv2", 1)
-
+load("gennet8.mat","genNet8")
+visualizeFilters_LindseyMethod(genNet8, "conv3", 32)
 %% Classify and softmax score
 % Extract RFs from your trained network
 load("retnet8.mat","retNet8")
@@ -160,3 +159,15 @@ scores_lines = minibatchpredict(RFClassifyNet, uint8(lines));
 fprintf('Blank: CS=%.3f, OR=%.3f\n', scores_blank(1), scores_blank(2));
 fprintf('Circle: CS=%.3f, OR=%.3f\n', scores_circle(1), scores_circle(2));
 fprintf('Lines: CS=%.3f, OR=%.3f\n', scores_lines(1), scores_lines(2));
+%% 
+input_test = dlarray(0.5 * ones([32, 32, 1, 1], 'single'), 'SSCB');
+
+% Check each layer sequentially
+layer_names = {'conv1', 'bn1', 'relu1', 'conv2'}; % adjust to your actual layer names
+
+for i = 1:length(layer_names)
+    out1 = forward(net1, input_test, 'Outputs', layer_names{i});
+    out2 = forward(net2, input_test, 'Outputs', layer_names{i});
+    diff = max(abs(out1(:) - out2(:)));
+    fprintf('%s output difference: %f\n', layer_names{i}, diff);
+end

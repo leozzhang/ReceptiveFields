@@ -1,24 +1,23 @@
 clear,clc
 load('retnet8.mat','retNet8'); %load transfer learning network
-%trainedNet=imagePretrainedNetwork("googlenet"); %load pretrained network
-firstConvLayer=retNet8.Layers(6);
-fprintf('Layer name: %s\n', firstConvLayer.Name); %check we have the right layer
 
-weights=firstConvLayer.Weights;
+% Extract conv1 weights
+conv1_layer = retNet8.Layers(4); % Assuming conv1 is layer 2
+conv1_weights = conv1_layer.Weights; % Should be [9, 9, 1, 32]
 
-filtersToShow=weights(:,:,1,:); %take first channel, all 64 filters
-filtersToShow=squeeze(filtersToShow); % remove singleton dimension
-
-%visualize
-figure
-for i=1:6
-    subplot(2,3,i);
-    imagesc(filtersToShow(:,:,i));
+% Visualize all 32 filters
+figure('Position', [100, 100, 1200, 800]);
+for i = 1:32
+    subplot(6, 6, i);
+    filter = conv1_weights(:,:,1,i);
+    imagesc(filter);
     colormap gray;
     axis off;
     title(sprintf('Filter %d', i), 'FontSize', 8);
+    % Normalize colormap for better visualization
+    caxis([min(filter(:)), max(filter(:))]);
 end
-sgtitle(sprintf('%s Filters', firstConvLayer.Name), 'Interpreter', 'none');
+sgtitle('Conv1 Filters from Trained Network');
 %% debug
 fprintf('Original weights size: %s\n', mat2str(size(weights)));
 filtersToShow=weights(:,:,1,:); 

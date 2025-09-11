@@ -2,13 +2,63 @@ function config = getOrientedRFConfig() % oriented generator parameters
     config.image_size = 25;
     config.center_position_range = [8, 17];  % min, max for both x and y
     config.orientation_steps = [0, 22.5, 45, 67.5, 90, 112.5, 135, 157.5];  % degrees
-    config.frequency_range = [5.0, 15.0];  % cycles across the RF
+    config.frequency_range = [5.0, 10.0];  % cycles across the RF
     config.sigma_x_range = [2, 6];  % width of Gaussian envelope (along bars)
     config.sigma_y_ratio_range = [2.0, 4.0];  % sigma_y = sigma_x * ratio (elongated)
     config.amplitude_range = [0.5, 1.5];  % strength of response
     config.noise_level_range = [0.0, 0.2];  % noise as fraction of signal
     config.normalize_energy = true;  % normalize to unit energy
     config.phases = [0, 90];  % 0 = bright center, 90 = dark center (degrees)
+end
+
+function background = generateCommonBackground(image_size, noise_level)
+    % Generate identical background noise for both CS and oriented RFs
+    % This ensures both classes have the same noise characteristics
+    
+    if nargin < 2
+        noise_level = 0.3;  % Default noise level to match your current settings
+    end
+    
+    % 1. Start with base background
+    background = zeros(image_size, image_size);
+    
+    % 2. Add consistent texture noise (matches your current 0.15 * randn)
+    texture_noise = noise_level * randn(image_size, image_size);
+    background = background + texture_noise;
+    
+    % 3. Add some low-frequency variations
+    [X, Y] = meshgrid(1:image_size, 1:image_size);
+    
+    % Add 2-3 random low-frequency components
+    for i = 1:3
+        freq_x = 0.1 + rand() * 0.1;  % Low frequency
+        freq_y = 0.1 + rand() * 0.1;
+        phase_x = rand() * 2 * pi;
+        phase_y = rand() * 2 * pi;
+        amplitude = 0.05 + rand() * 0.05;
+        
+        wave = amplitude * sin(2 * pi * freq_x * X + phase_x) .* ...
+               sin(2 * pi * freq_y * Y + phase_y);
+        background = background + wave;
+    end
+    
+    % 4. Add occasional random spots (same probability for both classes)
+    if rand() < 0.3  % 30% chance
+        num_spots = randi([1, 3]);
+        for spot = 1:num_spots
+            spot_x = randi([3, image_size-2]);
+            spot_y = randi([3, image_size-2]);
+            spot_size = 1 + rand() * 1.5;
+            spot_strength = 0.1 * (rand() - 0.5);
+            
+            spot_distances = sqrt((X - spot_x).^2 + (Y - spot_y).^2);
+            spot_mask = spot_distances <= spot_size;
+            background(spot_mask) = background(spot_mask) + spot_strength;
+        end
+    end
+    
+    % 5. Light blur to make it realistic
+    background = imgaussfilt(background, 0.4);
 end
 
 function [rf, params] = generateSingleOriented(varargin)
@@ -29,6 +79,8 @@ function [rf, params] = generateSingleOriented(varargin)
     addParameter(p, 'amplitude', [], @isnumeric);
     addParameter(p, 'phase', [], @isnumeric);  % 0 or 90 degrees
     addParameter(p, 'config', config, @isstruct);
+    addParameter(p, 'background', [], @isnumeric);
+   
     
     parse(p, varargin{:});
     
@@ -90,6 +142,13 @@ function [rf, params] = generateSingleOriented(varargin)
         phase = p.Results.phase;
     end
     
+    % START WITH COMMON BACKGROUND (add this after parsing)
+    if isempty(p.Results.background)
+        rf = generateCommonBackground(image_size);
+    else
+        rf = p.Results.background;
+    end
+
     % Create coordinate grids
     [X, Y] = meshgrid(1:image_size, 1:image_size);
     
@@ -136,8 +195,8 @@ function [rf, params] = generateSingleOriented(varargin)
     gaussian_irregular = gaussian + envelope_noise;
     gaussian_irregular = max(0, gaussian_irregular);  % Keep positive
     
-    % Combine irregular envelope with varied grating
-    rf = amplitude * gaussian_irregular .* grating;
+    pattern = amplitude * gaussian_irregular .* grating;
+    rf = rf + pattern;  % Add pattern to existing background
     
     % 6. Add some "breaks" in the bars occasionally
     if rand() < 0.3  % 30% chance
@@ -155,8 +214,8 @@ function [rf, params] = generateSingleOriented(varargin)
     end
     
     % 7. Add texture noise to break up perfect sinusoids
-    texture_noise = 0.1 * randn(size(rf));
-    rf = rf + texture_noise;
+    %texture_noise = 0.1 * randn(size(rf));
+    %rf = rf + texture_noise;
     
     % Store parameters used
     params = struct();
@@ -318,12 +377,12 @@ function config = getRFConfig()
     config.image_size = 25;
     config.center_position_range = [8, 17];  % min, max for both x and y
     config.center_radius_range = [1.5, 4.0];  % radius in pixels
-    config.surround_multiplier_range = [1.3, 2.5];  % surround = center * multiplier
+    config.surround_multiplier_range = [1.3, 2.2];  % surround = center * multiplier
     config.amplitude_range = [0.5, 1.5];  % strength of response
     config.noise_level_range = [0.0, 0.2];  % noise as fraction of signal
     config.normalize_energy = true;  % normalize to unit energy
-    config.center_value = 1.0;  % positive value for center
-    config.surround_value = -0.5;  % negative value for surround
+    config.center_value = 0.5;  % positive value for center
+    config.surround_value = -0.4;  % negative value for surround
 end
 function [rf, params] = generateSingleCenterSurround(varargin)
     % Generate a single center-surround receptive field
@@ -341,6 +400,7 @@ function [rf, params] = generateSingleCenterSurround(varargin)
     addParameter(p, 'amplitude', [], @isnumeric);
     addParameter(p, 'is_on_center', true, @islogical);
     addParameter(p, 'config', config, @isstruct);
+    addParameter(p, 'background', [], @isnumeric);
     
     parse(p, varargin{:});
     
@@ -409,7 +469,11 @@ function [rf, params] = generateSingleCenterSurround(varargin)
     distances = sqrt(X_scaled.^2 + Y_scaled.^2);
     
     % Initialize RF
-    rf = zeros(image_size, image_size);
+    if isempty(p.Results.background)
+        rf = generateCommonBackground(image_size);
+    else
+        rf = p.Results.background;
+    end
     
     % Create center region
     center_mask = distances <= center_radius;
@@ -456,10 +520,31 @@ function [rf, params] = generateSingleCenterSurround(varargin)
     
     rf(center_mask_irreg) = center_val * amplitude;
     rf(surround_mask_irreg) = surround_val * amplitude;
+
+    redistribution_factor = 0.3;  % How much to redistribute (0.3 = 30%)
+
+    % Find the pattern regions
+    pattern_mask = center_mask_irreg | surround_mask_irreg;
+    background_mask = ~pattern_mask;
     
+    % Calculate current pattern intensities
+    pattern_intensities = rf(pattern_mask);
+    current_pattern_range = max(pattern_intensities) - min(pattern_intensities);
+    
+    % Reduce pattern contrast
+    rf(pattern_mask) = rf(pattern_mask) * (1 - redistribution_factor);
+    
+    % Add the redistributed intensity to background as variation
+    background_variation = redistribution_factor * current_pattern_range;
+    background_noise = background_variation * (rand(size(rf)) - 0.5);
+    
+    % Apply variation mainly to background
+    rf(background_mask) = rf(background_mask) + background_noise(background_mask);
+    rf(pattern_mask) = rf(pattern_mask) + 0.3 * background_noise(pattern_mask);
+
     % 2. Add some texture/noise to break up smooth regions
-    texture_noise = 0.15 * randn(size(rf));
-    rf = rf + texture_noise;
+    %texture_noise = 0.15 * randn(size(rf));
+    %rf = rf + texture_noise;
     
     % 3. Light blur to soften harsh edges but keep structure
     rf = imgaussfilt(rf, 0.5);  % Less blur than before
