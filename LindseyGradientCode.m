@@ -96,8 +96,8 @@ sgtitle(sprintf('Receptive Fields (Lindsey Method) - %s', layerName));
 end
 
 
-load("gennet8.mat","genNet8")
-visualizeFilters_LindseyMethod(genNet8, "conv3", 32)
+load("retnet8.mat","retNet8")
+visualizeFilters_LindseyMethod(genNet8, "conv4", 32)
 %% Classify and softmax score
 % Extract RFs from your trained network
 load("retnet8.mat","retNet8")

@@ -183,14 +183,48 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     end
     
     optimized_weights = current_conv2_weights;
+    % Compute what gradient these weights currently produce
+    current_gradient = computeFilterRF_LindseyMethod(net, 'conv2', filter_idx);
+    
+    % Calculate scaling factor needed to match target brightness
+    target_mean = mean(target_gradient(:));
+    current_mean = mean(current_gradient(:));
+    brightness_scale = target_mean / current_mean;
+    
+    % Scale the weights by this factor
+    optimized_weights = optimized_weights * brightness_scale;
+    % Redefine net to include normalized weights
+    temp_layers = [
+            imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
+            convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...
+                'Weights', net.Layers(2).Weights, 'Bias', net.Layers(2).Bias)
+            reluLayer('Name', 'relu1')
+            convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...
+                'Weights', temp_weights, 'Bias', current_conv2_bias)
+             leakyReluLayer('Name', 'relu2')
+        
+            % TRAINABLE layers (experience-dependent)
+            convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+            reluLayer('Name', 'relu3')
+            convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+            reluLayer('Name', 'relu4')
+            fullyConnectedLayer(1024, 'Name', 'fc1')
+            reluLayer('Name', 'relu5')
+            fullyConnectedLayer(10, 'Name', 'fc_output')
+            softmaxLayer('Name', 'softmax')
+        ];
+    net=dlnetwork(temp_layers);
+
     fprintf('Optimization complete!\n');
     final_gradient = computeFilterRF_LindseyMethod(net, 'conv2', filter_idx);
+
+    %visualize
     figure;
     imagesc(final_gradient);
     colormap gray;
     title('Final Gradient');
 end
-simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0006.png")
+optimized_conv2_weights2=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0006.png")
 
 %% 
-save('optimized_conv2_weights.mat', 'ans');
+save('optimized_conv2_weights2.mat', 'optimized_conv2_weights2');
