@@ -1,4 +1,4 @@
-clear,clc
+%clear,clc
 %CS score functions
 function template = createCenterSurroundTemplate(h, w, cx, cy, center_r, surround_r)
 
@@ -140,7 +140,7 @@ genetic_conv1_bias = retNet8.Layers(2).Bias;
 genetic_conv2_weights = retNet8.Layers(4).Weights;  
 genetic_conv2_bias = retNet8.Layers(4).Bias;
 %load optimized reverse engineered weights
-load("optimized_conv2_weights2.mat","optimized_conv2_weights2")
+load("optimized_conv2_weights8.mat","optimized_conv2_weights8")
 
 rng(2)
 layers = [
@@ -154,7 +154,7 @@ layers = [
         reluLayer('Name', 'relu1')
         
         convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
-                          'Weights', optimized_conv2_weights2, ...
+                          'Weights', optimized_conv2_weights8, ...
                           'Bias', genetic_conv2_bias, ...
                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
         leakyReluLayer('Name', 'relu2')
@@ -199,9 +199,9 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-genNet8 = trainnet(imds_train_resized, net,"crossentropy",options);
+genNet87 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('gennet8wow.mat','genNet8')
+save('gennet87.mat','genNet87')
 %% Evaluate
 scores=minibatchpredict(genNet8,imds_test_resized);
 classes=categories(imds_test.Labels);

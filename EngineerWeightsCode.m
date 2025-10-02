@@ -1,4 +1,5 @@
 load("retnet8.mat","retNet8")
+rng(2)
 function rf = computeFilterRF_LindseyMethod(net, layerName, filterIndex, varargin)
 % COMPUTEFILTERRF_LINDSEYMETHOD - Exact replication of Lindsey et al. method
 % 
@@ -126,7 +127,7 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     fprintf('Resized target to: %dx%d\n', size(target_gradient,1), size(target_gradient,2));
     
     % Simple settings
-    max_iterations = 5000;
+    max_iterations = 2500;
     
     fprintf('Starting optimization...\n');
     
@@ -135,7 +136,14 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
         current_gradient = computeFilterRF_LindseyMethod(net, 'conv2', filter_idx);
         
         % How different is it from target?
-        error = sum((current_gradient(:) - target_gradient(:)).^2);
+        %error = sum((current_gradient(:) - target_gradient(:)).^2);
+        %testing error with normalized gradients
+        norm_target = (target_gradient - mean(target_gradient(:))) / std(target_gradient(:));
+        norm_current = (current_gradient - mean(current_gradient(:))) / std(current_gradient(:));
+    
+        % Compute error on normalized versions
+        error = sum((norm_current(:) - norm_target(:)).^2);
+
         fprintf('Iteration %d: Error = %.6f\n', iter, error);
         
         % If good enough, stop
@@ -172,8 +180,12 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
         
         % Compute new gradient
         new_gradient = computeFilterRF_LindseyMethod(temp_net, 'conv2', filter_idx);
-        new_error = sum((new_gradient(:) - target_gradient(:)).^2);
-        
+        %new_error = sum((new_gradient(:) - target_gradient(:)).^2);
+        %testing error with normalized gradients
+        norm_new = (new_gradient - mean(new_gradient(:))) / std(new_gradient(:));
+        % Compute normalized error
+        new_error = sum((norm_new(:) - norm_target(:)).^2);
+
         % If better, keep it
         if new_error < error
             current_conv2_weights = temp_weights;
@@ -200,7 +212,7 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
                 'Weights', net.Layers(2).Weights, 'Bias', net.Layers(2).Bias)
             reluLayer('Name', 'relu1')
             convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...
-                'Weights', temp_weights, 'Bias', current_conv2_bias)
+                'Weights', optimized_weights, 'Bias', current_conv2_bias)
              leakyReluLayer('Name', 'relu2')
         
             % TRAINABLE layers (experience-dependent)
@@ -224,7 +236,9 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     colormap gray;
     title('Final Gradient');
 end
-optimized_conv2_weights2=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0006.png")
+optimized_conv2_weights8=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
 
 %% 
-save('optimized_conv2_weights2.mat', 'optimized_conv2_weights2');
+save('optimized_conv2_weights8.mat', 'optimized_conv2_weights8');
+
+

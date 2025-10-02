@@ -92,12 +92,51 @@ for i = 1:numFilters
     axis off;
     title(sprintf('Filter %d', i), 'FontSize', 8);
 end
-sgtitle(sprintf('Receptive Fields (Lindsey Method) - %s', layerName));
+sgtitle(sprintf('Receptive Fields (Lindsey Method) - %s - %s', inputname(1), layerName));
 end
 
-
 load("retnet8.mat","retNet8")
-visualizeFilters_LindseyMethod(genNet8, "conv4", 32)
+genetic_conv1_weights = retNet8.Layers(2).Weights;
+genetic_conv1_bias = retNet8.Layers(2).Bias;
+genetic_conv2_weights = retNet8.Layers(4).Weights;  
+genetic_conv2_bias = retNet8.Layers(4).Bias;
+%load optimized reverse engineered weights
+load("optimized_conv2_weights8.mat","optimized_conv2_weights8")
+
+rng(2)
+layers = [
+        imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')  % 32x32 like retNet8
+        
+        % GENETIC layers from retNet8
+        convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...     % 9x9 like retNet8
+                          'Weights', genetic_conv1_weights, ...
+                          'Bias', genetic_conv1_bias, ...
+                          'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
+        reluLayer('Name', 'relu1')
+        
+        convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
+                          'Weights', optimized_conv2_weights8, ...
+                          'Bias', genetic_conv2_bias, ...
+                          'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
+        leakyReluLayer('Name', 'relu2')
+        
+        % TRAINABLE layers (experience-dependent)
+        convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+        reluLayer('Name', 'relu3')
+        convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+        reluLayer('Name', 'relu4')
+        fullyConnectedLayer(1024, 'Name', 'fc1')
+        reluLayer('Name', 'relu5')
+        fullyConnectedLayer(10, 'Name', 'fc_output')
+        softmaxLayer('Name', 'softmax')
+
+
+];
+
+newnet=dlnetwork(layers);
+
+load("gennet86.mat","genNet86")
+visualizeFilters_LindseyMethod(genNet86, "conv2", 1)
 %% Classify and softmax score
 % Extract RFs from your trained network
 load("retnet8.mat","retNet8")
