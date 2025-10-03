@@ -115,7 +115,7 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     % Extract current weights from retNet8
     current_conv2_weights = net.Layers(4).Weights; % Adjust index as needed
     current_conv2_bias = net.Layers(4).Bias;
-    
+    initial_weights = current_conv2_weights;
     filter_idx = 1;
     
     % Compute current gradient to get size
@@ -127,7 +127,7 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     fprintf('Resized target to: %dx%d\n', size(target_gradient,1), size(target_gradient,2));
     
     % Simple settings
-    max_iterations = 2500;
+    max_iterations = 1500;
     
     fprintf('Starting optimization...\n');
     
@@ -136,13 +136,15 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
         current_gradient = computeFilterRF_LindseyMethod(net, 'conv2', filter_idx);
         
         % How different is it from target?
-        %error = sum((current_gradient(:) - target_gradient(:)).^2);
+        %1 error = sum((current_gradient(:) - target_gradient(:)).^2);
         %testing error with normalized gradients
         norm_target = (target_gradient - mean(target_gradient(:))) / std(target_gradient(:));
         norm_current = (current_gradient - mean(current_gradient(:))) / std(current_gradient(:));
-    
         % Compute error on normalized versions
-        error = sum((norm_current(:) - norm_target(:)).^2);
+        lambda = 0.01;  % Adjust as needed
+        pattern_error = sum((norm_current(:) - norm_target(:)).^2);
+        deviation_penalty = lambda * sum((current_conv2_weights(:) - initial_weights(:)).^2);
+        error = pattern_error + deviation_penalty;
 
         fprintf('Iteration %d: Error = %.6f\n', iter, error);
         
@@ -183,9 +185,9 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
         %new_error = sum((new_gradient(:) - target_gradient(:)).^2);
         %testing error with normalized gradients
         norm_new = (new_gradient - mean(new_gradient(:))) / std(new_gradient(:));
-        % Compute normalized error
-        new_error = sum((norm_new(:) - norm_target(:)).^2);
-
+        pattern_error = sum((norm_new(:) - norm_target(:)).^2);
+        deviation_penalty = lambda * sum((temp_weights(:) - initial_weights(:)).^2);
+        new_error = pattern_error + deviation_penalty;
         % If better, keep it
         if new_error < error
             current_conv2_weights = temp_weights;
@@ -199,10 +201,12 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     current_gradient = computeFilterRF_LindseyMethod(net, 'conv2', filter_idx);
     
     % Calculate scaling factor needed to match target brightness
-    target_mean = mean(target_gradient(:));
-    current_mean = mean(current_gradient(:));
-    brightness_scale = target_mean / current_mean;
-    
+    %target_mean = mean(target_gradient(:));
+    %current_mean = mean(current_gradient(:));
+    %brightness_scale = target_mean / current_mean;
+    current_max=max(abs(current_conv2_weights(:)));
+    desired_max=0.005;
+    brightness_scale=desired_max/current_max;
     % Scale the weights by this factor
     optimized_weights = optimized_weights * brightness_scale;
     % Redefine net to include normalized weights
@@ -236,9 +240,51 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     colormap gray;
     title('Final Gradient');
 end
-optimized_conv2_weights8=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
+optimized_conv2_weights14=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0008.png")
 
 %% 
-save('optimized_conv2_weights8.mat', 'optimized_conv2_weights8');
+save('optimized_conv2_weights14.mat', 'optimized_conv2_weights14');
 
+%% comparing weights values to find differences.
 
+good_versions = [13];
+bad_versions = [12];
+
+fprintf('Version | Type | Mean    | Std     | Min     | Max     | Range\n');
+fprintf('--------|------|---------|---------|---------|---------|--------\n');
+
+% Check good versions
+for v = good_versions
+    filename = sprintf('optimized_conv2_weights%d.mat', v);
+    loaded = load(filename);
+    varname = sprintf('optimized_conv2_weights%d', v);
+    w = loaded.(varname);
+    
+    fprintf('%7d | GOOD | %7.3f | %7.3f | %7.3f | %7.3f | %7.3f\n', ...
+        v, mean(w(:)), std(w(:)), min(w(:)), max(w(:)), max(w(:))-min(w(:)));
+end
+
+% Check bad versions
+for v = bad_versions
+    filename = sprintf('optimized_conv2_weights%d.mat', v);
+    loaded = load(filename);
+    varname = sprintf('optimized_conv2_weights%d', v);
+    w = loaded.(varname);
+    
+    fprintf('%7d | BAD  | %7.3f | %7.3f | %7.3f | %7.3f | %7.3f\n', ...
+        v, mean(w(:)), std(w(:)), min(w(:)), max(w(:)), max(w(:))-min(w(:)));
+end
+%% 
+load("retnet8.mat","retNet8")
+retNet8.Layers(4).Weights
+%% histogram of weights
+filename = 'optimized_conv2_weights12.mat';
+load(filename);
+w = optimized_conv2_weights12(:);
+
+figure;
+subplot(2,1,1);
+violinplot(w, 'Orientation', 'horizontal');
+title(filename);
+xlabel('Weight Value');
+set(gca, "FontSize", 14)

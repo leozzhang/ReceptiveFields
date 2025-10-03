@@ -140,7 +140,7 @@ genetic_conv1_bias = retNet8.Layers(2).Bias;
 genetic_conv2_weights = retNet8.Layers(4).Weights;  
 genetic_conv2_bias = retNet8.Layers(4).Bias;
 %load optimized reverse engineered weights
-load("optimized_conv2_weights8.mat","optimized_conv2_weights8")
+load("optimized_conv2_weights12.mat","optimized_conv2_weights12")
 
 rng(2)
 layers = [
@@ -154,7 +154,7 @@ layers = [
         reluLayer('Name', 'relu1')
         
         convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
-                          'Weights', optimized_conv2_weights8, ...
+                          'Weights', -1*optimized_conv2_weights14, ...
                           'Bias', genetic_conv2_bias, ...
                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
         leakyReluLayer('Name', 'relu2')
@@ -199,9 +199,9 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-genNet87 = trainnet(imds_train_resized, net,"crossentropy",options);
+genNet818 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('gennet87.mat','genNet87')
+save('gennet818.mat','genNet818')
 %% Evaluate
 scores=minibatchpredict(genNet8,imds_test_resized);
 classes=categories(imds_test.Labels);

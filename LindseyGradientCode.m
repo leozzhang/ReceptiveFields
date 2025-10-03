@@ -101,7 +101,7 @@ genetic_conv1_bias = retNet8.Layers(2).Bias;
 genetic_conv2_weights = retNet8.Layers(4).Weights;  
 genetic_conv2_bias = retNet8.Layers(4).Bias;
 %load optimized reverse engineered weights
-load("optimized_conv2_weights8.mat","optimized_conv2_weights8")
+load("optimized_conv2_weights4.mat","optimized_conv2_weights4")
 
 rng(2)
 layers = [
@@ -115,7 +115,7 @@ layers = [
         reluLayer('Name', 'relu1')
         
         convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
-                          'Weights', optimized_conv2_weights8, ...
+                          'Weights', optimized_conv2_weights4, ...
                           'Bias', genetic_conv2_bias, ...
                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
         leakyReluLayer('Name', 'relu2')
@@ -135,8 +135,8 @@ layers = [
 
 newnet=dlnetwork(layers);
 
-load("gennet86.mat","genNet86")
-visualizeFilters_LindseyMethod(genNet86, "conv2", 1)
+load("gennet814.mat","genNet814")
+visualizeFilters_LindseyMethod(genNet814, "conv2", 1)
 %% Classify and softmax score
 % Extract RFs from your trained network
 load("retnet8.mat","retNet8")
