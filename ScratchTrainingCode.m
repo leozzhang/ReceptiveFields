@@ -140,7 +140,10 @@ genetic_conv1_bias = retNet8.Layers(2).Bias;
 genetic_conv2_weights = retNet8.Layers(4).Weights;  
 genetic_conv2_bias = retNet8.Layers(4).Bias;
 %load optimized reverse engineered weights
-load("optimized_conv2_weights12.mat","optimized_conv2_weights12")
+load("optimized_conv2_weights14.mat","optimized_conv2_weights14")
+load("optimized_conv2_weights17.mat","optimized_conv2_weights17")
+bothconv2=cat(4, optimized_conv2_weights17, -1*optimized_conv2_weights14);
+bothbias=reshape([genetic_conv2_bias;genetic_conv2_bias],[1, 1, 2]);
 
 rng(2)
 layers = [
@@ -154,7 +157,7 @@ layers = [
         reluLayer('Name', 'relu1')
         
         convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
-                          'Weights', -1*optimized_conv2_weights14, ...
+                          'Weights', optimized_conv2_weights14, ...
                           'Bias', genetic_conv2_bias, ...
                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
         leakyReluLayer('Name', 'relu2')
@@ -164,6 +167,16 @@ layers = [
         reluLayer('Name', 'relu3')
         convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
         reluLayer('Name', 'relu4')
+        convolution2dLayer(9,32,"Name","conv5","Padding","same")
+        reluLayer("Name","reluextra")
+        convolution2dLayer(9,32,"Name","conv6","Padding","same")
+        reluLayer("Name","reluextra2")
+        convolution2dLayer(9,32,"Name","conv7","Padding","same")
+        reluLayer("Name","reluextra3")
+        convolution2dLayer(9,32,"Name","conv8","Padding","same")
+        reluLayer("Name","reluextra4")
+        convolution2dLayer(9,32,"Name","conv9","Padding","same")
+        reluLayer("Name","reluextra5")
         fullyConnectedLayer(1024, 'Name', 'fc1')
         reluLayer('Name', 'relu5')
         fullyConnectedLayer(10, 'Name', 'fc_output')
@@ -199,9 +212,9 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-genNet818 = trainnet(imds_train_resized, net,"crossentropy",options);
+genNet827 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('gennet818.mat','genNet818')
+save('gennet827.mat','genNet827')
 %% Evaluate
 scores=minibatchpredict(genNet8,imds_test_resized);
 classes=categories(imds_test.Labels);

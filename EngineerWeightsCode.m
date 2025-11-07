@@ -240,10 +240,10 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     colormap gray;
     title('Final Gradient');
 end
-optimized_conv2_weights14=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0008.png")
+optimized_conv2_weights17=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0006.png")
 
 %% 
-save('optimized_conv2_weights14.mat', 'optimized_conv2_weights14');
+save('optimized_conv2_weights17.mat', 'optimized_conv2_weights17');
 
 %% comparing weights values to find differences.
 
@@ -278,9 +278,9 @@ end
 load("retnet8.mat","retNet8")
 retNet8.Layers(4).Weights
 %% histogram of weights
-filename = 'optimized_conv2_weights12.mat';
+filename = 'optimized_conv2_weights17.mat';
 load(filename);
-w = optimized_conv2_weights12(:);
+w = optimized_conv2_weights17(:);
 
 figure;
 subplot(2,1,1);

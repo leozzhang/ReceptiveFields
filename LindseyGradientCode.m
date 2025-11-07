@@ -135,8 +135,8 @@ layers = [
 
 newnet=dlnetwork(layers);
 
-load("gennet814.mat","genNet814")
-visualizeFilters_LindseyMethod(genNet814, "conv2", 1)
+load("gennet827.mat","genNet827")
+visualizeFilters_LindseyMethod(genNet827, "conv9", 32)
 %% Classify and softmax score
 % Extract RFs from your trained network
 load("retnet8.mat","retNet8")
