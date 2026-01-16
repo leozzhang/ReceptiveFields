@@ -101,112 +101,154 @@ genetic_conv1_bias = retNet8.Layers(2).Bias;
 genetic_conv2_weights = retNet8.Layers(4).Weights;  
 genetic_conv2_bias = retNet8.Layers(4).Bias;
 %load optimized reverse engineered weights
-load("optimized_conv2_weights4.mat","optimized_conv2_weights4")
+%load("optimized_conv2_weights4.mat","optimized_conv2_weights4")
 
 rng(2)
-layers = [
-        imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')  % 32x32 like retNet8
-        
-        % GENETIC layers from retNet8
-        convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...     % 9x9 like retNet8
-                          'Weights', genetic_conv1_weights, ...
-                          'Bias', genetic_conv1_bias, ...
-                          'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
-        reluLayer('Name', 'relu1')
-        
-        convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
-                          'Weights', optimized_conv2_weights4, ...
-                          'Bias', genetic_conv2_bias, ...
-                          'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
-        leakyReluLayer('Name', 'relu2')
-        
-        % TRAINABLE layers (experience-dependent)
-        convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
-        reluLayer('Name', 'relu3')
-        convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
-        reluLayer('Name', 'relu4')
-        fullyConnectedLayer(1024, 'Name', 'fc1')
-        reluLayer('Name', 'relu5')
-        fullyConnectedLayer(10, 'Name', 'fc_output')
-        softmaxLayer('Name', 'softmax')
+% layers = [
+%         imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')  % 32x32 like retNet8
+% 
+%         % GENETIC layers from retNet8
+%         convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...     % 9x9 like retNet8
+%                           'Weights', genetic_conv1_weights, ...
+%                           'Bias', genetic_conv1_bias, ...
+%                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
+%         reluLayer('Name', 'relu1')
+% 
+%         convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
+%                           'Weights', optimized_conv2_weights4, ...
+%                           'Bias', genetic_conv2_bias, ...
+%                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
+%         leakyReluLayer('Name', 'relu2')
+% 
+%         % TRAINABLE layers (experience-dependent)
+%         convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+%         reluLayer('Name', 'relu3')
+%         convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+%         reluLayer('Name', 'relu4')
+%         fullyConnectedLayer(1024, 'Name', 'fc1')
+%         reluLayer('Name', 'relu5')
+%         fullyConnectedLayer(10, 'Name', 'fc_output')
+%         softmaxLayer('Name', 'softmax')
+% 
+% 
+% ];
 
+% newnet=dlnetwork(layers);
 
-];
+load("retNet15.mat","retNet15")
+visualizeFilters_LindseyMethod(retNet15, "conv2", 1)
 
-newnet=dlnetwork(layers);
-
-load("gennet827.mat","genNet827")
-visualizeFilters_LindseyMethod(genNet827, "conv9", 32)
-%% Classify and softmax score
-% Extract RFs from your trained network
-load("retnet8.mat","retNet8")
-load("rfclassifynet.mat","RFClassifyNet")
-net = retNet8;
-layerName = "conv2";
-numFilters = 1;  % or however many you want to classify
-
-% Map each layer name to its receptive field size
-rfSizes = containers.Map( ...
-    {'conv1','conv2','conv3','conv4'}, ...
-    [9, 17, 25, 33]);
-
-% Extract all RFs as arrays
-rfs = zeros(numFilters, 25, 25);  % final size for classifier
-
-for i = 1:numFilters
-    rf = computeFilterRF_LindseyMethod(net, layerName, i, 'InputSize', [32, 32, 1]);
-
-    % Get receptive field size for this layer
-    cropSize = rfSizes(layerName);
-
-    % Crop center patch of size cropSize × cropSize
-    center = floor(size(rf,1)/2) + 1;
-    half = floor(cropSize/2);
-    rf_cropped = rf(center-half:center+half, center-half:center+half);
-
-    % Resize to 25×25 for classifier
-    rf_resized = imresize(rf_cropped, [25, 25]);
-
-    % Store in batch
-    rfs(i, :, :) = rf_resized;
-end
-
-% Now classify all your CNN filters
-for i = 1:numFilters
-    single_rf = squeeze(rfs(i, :, :));
-    
-    % PREPROCESS to match training data distribution
-    % Convert to same format as your training data
-    single_rf_norm = (single_rf - mean(single_rf(:))) / std(single_rf(:));  % Z-score
-    single_rf_scaled = single_rf_norm * 20 + 150;  % Match training: std=20, mean=150
-    single_rf_final = uint8(max(0, min(255, single_rf_scaled)));  % Convert to uint8
-    
-    scores = minibatchpredict(RFClassifyNet, single_rf_final);
-    predicted_label = scores2label(scores, ["center_surround", "oriented"]);
-    fprintf('Filter %d: %s (CS: %.3f, OR: %.3f)\n', i, predicted_label, scores(1), scores(2));
-end
 %% 
-% Create simple test patterns
-blank = ones(25, 25) * 150;  % Solid gray
-circle = blank; circle(8:17, 8:17) = 200;  % White square
-lines = blank; lines(:, 12:13) = 200;  % Vertical lines
+function visualizeGradientAscentWithGradient(net, layerName, filterIndex, varargin)
+% VISUALIZEGRADIENTASCENTWITHGRADIENT - Show the gradient explicitly
+%
+% Creates a 3-panel or 4-panel figure showing:
+%   1. Initial gray image
+%   2. Gradient heat map (what the network computed)
+%   3. Final RF (after applying gradient)
+%   4. Activation values
 
-scores_blank = minibatchpredict(RFClassifyNet, uint8(blank));
-scores_circle = minibatchpredict(RFClassifyNet, uint8(circle));
-scores_lines = minibatchpredict(RFClassifyNet, uint8(lines));
+p = inputParser;
+addParameter(p, 'InputSize', [32, 32, 1], @isnumeric);
+addParameter(p, 'StepSize', 1.0, @isnumeric);
+addParameter(p, 'SpatialPos', 'center', @ischar);
+parse(p, varargin{:});
 
-fprintf('Blank: CS=%.3f, OR=%.3f\n', scores_blank(1), scores_blank(2));
-fprintf('Circle: CS=%.3f, OR=%.3f\n', scores_circle(1), scores_circle(2));
-fprintf('Lines: CS=%.3f, OR=%.3f\n', scores_lines(1), scores_lines(2));
-%% 
-input_test = dlarray(0.5 * ones([32, 32, 1, 1], 'single'), 'SSCB');
+inputSize = p.Results.InputSize;
+stepSize = p.Results.StepSize;
+spatialPos = p.Results.SpatialPos;
 
-% Check each layer sequentially
-layer_names = {'conv1', 'bn1', 'relu1', 'conv2'}; % adjust to your actual layer names
+% Initialize gray image
+inputImg = dlarray(0.5 * ones([inputSize, 1], 'single'), 'SSCB');
 
-for i = 1:length(layer_names)
-    out1 = forward(net1, input_test, 'Outputs', layer_names{i});
-    out2 = forward(net2, input_test, 'Outputs', layer_names{i});
-    diff = max(abs(out1(:) - out2(:)));
-    fprintf('%s output difference: %f\n', layer_names{i}, diff);
+% Get initial activation
+[activation_initial, ~] = dlfeval(@lindseyLossFcn, net, inputImg, layerName, filterIndex, spatialPos);
+
+% Compute gradient (this is the key computation!)
+[~, gradients] = dlfeval(@lindseyLossFcn, net, inputImg, layerName, filterIndex, spatialPos);
+
+% Normalize gradient (like Lindsey method)
+gradNorm = sqrt(sum(gradients.^2, 'all'));
+if gradNorm > 1e-5
+    gradients_normalized = gradients / (gradNorm + 1e-5);
+else
+    gradients_normalized = gradients;
 end
+
+% Apply gradient
+inputImg_updated = inputImg + stepSize * gradients_normalized;
+
+% Get final activation
+[activation_final, ~] = dlfeval(@lindseyLossFcn, net, inputImg_updated, layerName, filterIndex, spatialPos);
+
+% Extract for visualization
+initial_img = extractdata(squeeze(inputImg(:, :, 1, 1)));
+gradient_img = extractdata(squeeze(gradients_normalized(:, :, 1, 1)));
+final_img = extractdata(squeeze(inputImg_updated(:, :, 1, 1)));
+
+% Post-process final RF (like Lindsey)
+final_rf = postProcessRF(final_img);
+
+% Create figure
+figure('Position', [100, 100, 1400, 400]);
+
+% Panel 1: Initial gray image
+subplot(1, 4, 1);
+imagesc(initial_img);
+colormap(gca, gray);
+axis off;
+title(sprintf('Initial Image\n(Gray)\nActivation: %.3f', extractdata(activation_initial)), ...
+    'FontSize', 11, 'FontWeight', 'bold');
+colorbar;
+clim([0, 1]);
+
+% Panel 2: Gradient heat map
+subplot(1, 4, 2);
+imagesc(gradient_img);
+colormap(gca, jet);  % HEATMAP COLOR
+axis off;
+title(sprintf('Gradient\n∇ Activation'), ...
+    'FontSize', 11, 'FontWeight', 'bold');
+colorbar;
+% For standard heatmap, you might want to NOT center at zero:
+% caxis([min(gradient_img(:)), max(gradient_img(:))]);
+% OR keep it centered to show positive/negative:
+clim([-max(abs(gradient_img(:))), max(abs(gradient_img(:)))]);
+
+% Panel 3: Raw updated image
+subplot(1, 4, 3);
+imagesc(final_img);
+colormap(gca, gray);
+axis off;
+title(sprintf('Updated Image\n(Gray + Gradient)\nActivation: %.3f', extractdata(activation_final)), ...
+    'FontSize', 11, 'FontWeight', 'bold');
+colorbar;
+clim([0, 1]);
+
+% Panel 4: Post-processed RF
+subplot(1, 4, 4);
+imagesc(final_rf);
+colormap(gca, gray);
+axis off;
+title(sprintf('Final RF\n(Post-processed)'), ...
+    'FontSize', 11, 'FontWeight', 'bold');
+colorbar;
+clim([0, 1]);
+
+sgtitle(sprintf('Gradient-Based Receptive Field Computation'), 'FontSize', 14, 'FontWeight', 'bold');
+end
+
+function rf = postProcessRF(rawImg)
+% Post-process exactly like Lindsey paper
+rf = rawImg - mean(rawImg(:));
+rf_std = std(rf(:));
+if rf_std > 1e-5
+    rf = rf / rf_std;
+end
+rf = rf * 0.1;
+rf = rf + 0.5;
+rf = max(0, min(1, rf));
+end
+
+load('retnet13.mat', 'retNet13');
+visualizeGradientAscentWithGradient(retNet13, 'conv2', 1);
