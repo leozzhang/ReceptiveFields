@@ -11,9 +11,14 @@ slprj/
 *.mat
 mnist_png/
 cifar10/
+rf_dataset500/
+training_images/
 
 # System files
 .DS_Store
 Thumbs.db
 
 misc_references/
+
+*.docx
+*.png
