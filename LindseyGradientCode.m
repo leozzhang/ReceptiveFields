@@ -104,39 +104,31 @@ genetic_conv2_bias = retNet8.Layers(4).Bias;
 %load("optimized_conv2_weights4.mat","optimized_conv2_weights4")
 
 rng(2)
-% layers = [
-%         imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')  % 32x32 like retNet8
-% 
-%         % GENETIC layers from retNet8
-%         convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...     % 9x9 like retNet8
-%                           'Weights', genetic_conv1_weights, ...
-%                           'Bias', genetic_conv1_bias, ...
-%                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
-%         reluLayer('Name', 'relu1')
-% 
-%         convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...      % Bottleneck like retNet8
-%                           'Weights', optimized_conv2_weights4, ...
-%                           'Bias', genetic_conv2_bias, ...
-%                           'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
-%         leakyReluLayer('Name', 'relu2')
-% 
-%         % TRAINABLE layers (experience-dependent)
-%         convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
-%         reluLayer('Name', 'relu3')
-%         convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
-%         reluLayer('Name', 'relu4')
-%         fullyConnectedLayer(1024, 'Name', 'fc1')
-%         reluLayer('Name', 'relu5')
-%         fullyConnectedLayer(10, 'Name', 'fc_output')
-%         softmaxLayer('Name', 'softmax')
-% 
-% 
-% ];
+layers = [
+    imageInputLayer([32 32 1], 'Name', 'input')
+    %retina-net
+    convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same') 
+    reluLayer('Name', 'relu1')
+    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
+    leakyReluLayer('Name', 'relu2')
 
-% newnet=dlnetwork(layers);
+    %vvs-net
+    convolution2dLayer(9,32,'Name', 'conv3', 'Padding', 'same')
+    reluLayer('Name', 'relu3')
+    convolution2dLayer(9,32,'Name','conv4', 'Padding', 'same')
+    reluLayer('Name','relu4')
+
+    fullyConnectedLayer(1024,'Name', 'fc1')
+    reluLayer('Name', 'relu5')
+    fullyConnectedLayer(10, 'Name', 'fc_output')
+    softmaxLayer('Name', 'softmax')
+];
+
+
+newnet=dlnetwork(layers);
 
 load("retNet15.mat","retNet15")
-visualizeFilters_LindseyMethod(retNet15, "conv2", 1)
+visualizeFilters_LindseyMethod(newnet, "conv2", 1)
 
 %% 
 function visualizeGradientAscentWithGradient(net, layerName, filterIndex, varargin)
@@ -193,7 +185,7 @@ final_rf = postProcessRF(final_img);
 figure('Position', [100, 100, 1400, 400]);
 
 % Panel 1: Initial gray image
-subplot(1, 4, 1);
+subplot(1, 3, 1);
 imagesc(initial_img);
 colormap(gca, gray);
 axis off;
@@ -203,30 +195,30 @@ colorbar;
 clim([0, 1]);
 
 % Panel 2: Gradient heat map
-subplot(1, 4, 2);
-imagesc(gradient_img);
-colormap(gca, jet);  % HEATMAP COLOR
-axis off;
-title(sprintf('Gradient\n∇ Activation'), ...
-    'FontSize', 11, 'FontWeight', 'bold');
-colorbar;
-% For standard heatmap, you might want to NOT center at zero:
-% caxis([min(gradient_img(:)), max(gradient_img(:))]);
-% OR keep it centered to show positive/negative:
-clim([-max(abs(gradient_img(:))), max(abs(gradient_img(:)))]);
+% subplot(1, 4, 2);
+% imagesc(gradient_img);
+% colormap(gca, jet);  % HEATMAP COLOR
+% axis off;
+% title(sprintf('Gradient\n∇ Activation'), ...
+%     'FontSize', 11, 'FontWeight', 'bold');
+% colorbar;
+% % For standard heatmap, you might want to NOT center at zero:
+% % caxis([min(gradient_img(:)), max(gradient_img(:))]);
+% % OR keep it centered to show positive/negative:
+% clim([-max(abs(gradient_img(:))), max(abs(gradient_img(:)))]);
 
 % Panel 3: Raw updated image
-subplot(1, 4, 3);
+subplot(1, 3, 2);
 imagesc(final_img);
 colormap(gca, gray);
 axis off;
-title(sprintf('Updated Image\n(Gray + Gradient)\nActivation: %.3f', extractdata(activation_final)), ...
+title(sprintf('Updated Image\n(Gray + Gradient ∇ Activation)\nActivation: %.3f', extractdata(activation_final)), ...
     'FontSize', 11, 'FontWeight', 'bold');
 colorbar;
 clim([0, 1]);
 
 % Panel 4: Post-processed RF
-subplot(1, 4, 4);
+subplot(1, 3, 3);
 imagesc(final_rf);
 colormap(gca, gray);
 axis off;

@@ -240,7 +240,7 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     colormap gray;
     title('Final Gradient');
 end
-optimized_conv2_weights17=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0006.png")
+optimized_conv2_weights18=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
 
 %% 
 save('optimized_conv2_weights17.mat', 'optimized_conv2_weights17');
@@ -288,3 +288,115 @@ violinplot(w, 'Orientation', 'horizontal');
 title(filename);
 xlabel('Weight Value');
 set(gca, "FontSize", 14)
+%% making methods figure
+
+function generateOptimizationFigureImages(net, target_image_path)
+    % Simple function - give it network and target, get 5 figures
+    %
+    % Inputs:
+    %   net - Your network with initial conv2 weights
+    %   target_image_path - Path to target center-surround image
+    
+    % Load target
+    target_img = imread(target_image_path);
+    if size(target_img, 3) == 3
+        target_img = rgb2gray(target_img);
+    end
+    target = double(target_img) / 255;
+    target = target - mean(target(:));
+    
+    % Get initial weights
+    initial_weights = net.Layers(4).Weights;
+    initial_bias = net.Layers(4).Bias;
+    conv1_weights = net.Layers(2).Weights;
+    conv1_bias = net.Layers(2).Bias;
+    
+    % Compute initial RF
+    initial_rf = computeFilterRF_LindseyMethod(net, 'conv2', 1);
+    target = imresize(target, size(initial_rf));
+    
+    % Compute initial loss
+    loss_initial = computeLoss(initial_rf, target, initial_weights, initial_weights);
+    
+    % Create perturbed weights (one iteration)
+    perturbed_weights = initial_weights + randn(size(initial_weights)) * 0.5;
+    
+    % Build temp network with perturbed weights
+    temp_layers = [
+        imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
+        convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...
+            'Weights', conv1_weights, 'Bias', conv1_bias)
+        reluLayer('Name', 'relu1')
+        convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...
+            'Weights', perturbed_weights, 'Bias', initial_bias)
+        leakyReluLayer('Name', 'relu2')
+        convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+        reluLayer('Name', 'relu3')
+        convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+        reluLayer('Name', 'relu4')
+        fullyConnectedLayer(1024, 'Name', 'fc1')
+        reluLayer('Name', 'relu5')
+        fullyConnectedLayer(10, 'Name', 'fc_output')
+        softmaxLayer('Name', 'softmax')
+    ];
+    temp_net = dlnetwork(temp_layers);
+    
+    % Compute perturbed RF
+    perturbed_rf = computeFilterRF_LindseyMethod(temp_net, 'conv2', 1);
+    
+    % Compute perturbed loss
+    loss_perturbed = computeLoss(perturbed_rf, target, perturbed_weights, initial_weights);
+    
+    % Display 5 figures
+    figure;
+    imagesc(target);
+    colormap('gray');
+    axis square off;
+    colorbar;
+    title('Target RF');
+    
+    figure;
+    imagesc(initial_weights(:,:,1,1));
+    colormap('gray');
+    axis square off;
+    colorbar;
+    title('Initial Weights');
+    
+    figure;
+    imagesc(initial_rf);
+    colormap('gray');
+    axis square off;
+    colorbar;
+    title(sprintf('Initial RF (Loss = %.4f)', loss_initial));
+    
+    figure;
+    imagesc(perturbed_weights(:,:,1,1));
+    colormap('gray');
+    axis square off;
+    colorbar;
+    title('Perturbed Weights');
+    
+    figure;
+    imagesc(perturbed_rf);
+    colormap('gray');
+    axis square off;
+    colorbar;
+    title(sprintf('Perturbed RF (Loss = %.4f)', loss_perturbed));
+    
+    fprintf('Initial loss:   %.6f\n', loss_initial);
+    fprintf('Perturbed loss: %.6f\n', loss_perturbed);
+end
+
+function loss = computeLoss(rf, target, weights, initial_weights)
+    norm_rf = (rf - mean(rf(:))) / std(rf(:));
+    norm_target = (target - mean(target(:))) / std(target(:));
+    lambda = 0.01;
+    pattern_error = sum((norm_rf(:) - norm_target(:)).^2);
+    deviation_penalty = lambda * sum((weights(:) - initial_weights(:)).^2);
+    loss = pattern_error + deviation_penalty;
+end
+
+load("retnet8.mat","retNet8");
+generateOptimizationFigureImages(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
+
+
