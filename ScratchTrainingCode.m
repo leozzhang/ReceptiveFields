@@ -12,13 +12,13 @@
 %bothconv2=cat(4, optimized_conv2_weights17, -1*optimized_conv2_weights14);
 %bothbias=reshape([genetic_conv2_bias;genetic_conv2_bias],[1, 1, 2]);
 
-rng(69)
+rng(2)
 layers = [
     imageInputLayer([32 32 1], 'Name', 'input')
     %retina-net
     convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same') 
     reluLayer('Name', 'relu1')
-    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
+    convolution2dLayer(9, 32, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
     leakyReluLayer('Name', 'relu2')
 
     %vvs-net
@@ -38,13 +38,13 @@ net=dlnetwork(layers);
 % Scale conv2 weights
 conv2_idx = find(strcmp({net.Layers.Name}, 'conv2'));
 conv2 = net.Layers(conv2_idx);
-conv2.Weights = 0.7 * conv2.Weights;
+conv2.Weights = 1 * conv2.Weights;
 net = replaceLayer(net, 'conv2', conv2);
 
 exinputsize=net.Layers(1).InputSize;
 
-trainPath='C:\Users\Leo Zhang\OneDrive\Desktop\Research\ReceptiveFields\cifar10\train';
-testPath='C:\Users\Leo Zhang\OneDrive\Desktop\Research\ReceptiveFields\cifar10\test';
+trainPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\train';
+testPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\test';
 imds_train=imageDatastore(trainPath,'IncludeSubfolders',true,'LabelSource','foldernames');
 imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','foldernames');
 [imds_train_split, imds_val_split] = splitEachLabel(imds_train, 0.8, 'randomized');
@@ -67,9 +67,9 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-retNet18 = trainnet(imds_train_resized, net,"crossentropy",options);
+retNet21 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('retnet18.mat','retNet18')
+save('retnet21.mat','retNet21')
 %% Evaluate
 scores=minibatchpredict(genNet8,imds_test_resized);
 classes=categories(imds_test.Labels);

@@ -399,4 +399,15 @@ end
 load("retnet8.mat","retNet8");
 generateOptimizationFigureImages(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
 
+%% 
+% Simple weight visualization
+load('optimized_conv2_weights17.mat');
+
+% Visualize first slice (9x9 from first conv1 channel connection)
+figure;
+imagesc(optimized_conv2_weights17(:,:,1,1));
+colormap('gray');
+colorbar;
+axis square;
+title('Optimized Conv2 Weights (slice 1)');
 

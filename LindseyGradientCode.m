@@ -128,7 +128,7 @@ layers = [
 newnet=dlnetwork(layers);
 
 load("retNet15.mat","retNet15")
-visualizeFilters_LindseyMethod(newnet, "conv2", 1)
+visualizeFilters_LindseyMethod(retNet21, "conv4", 32)
 
 %% 
 function visualizeGradientAscentWithGradient(net, layerName, filterIndex, varargin)
@@ -222,7 +222,7 @@ subplot(1, 3, 3);
 imagesc(final_rf);
 colormap(gca, gray);
 axis off;
-title(sprintf('Final RF\n(Post-processed)'), ...
+title(sprintf('Final GRF\n(Normalized)'), ...
     'FontSize', 11, 'FontWeight', 'bold');
 colorbar;
 clim([0, 1]);
