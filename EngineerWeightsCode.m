@@ -205,7 +205,7 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     %current_mean = mean(current_gradient(:));
     %brightness_scale = target_mean / current_mean;
     current_max=max(abs(current_conv2_weights(:)));
-    desired_max=0.005;
+    desired_max=0.01;
     brightness_scale=desired_max/current_max;
     % Scale the weights by this factor
     optimized_weights = optimized_weights * brightness_scale;

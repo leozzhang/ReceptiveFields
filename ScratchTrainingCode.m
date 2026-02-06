@@ -18,7 +18,7 @@ layers = [
     %retina-net
     convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same') 
     reluLayer('Name', 'relu1')
-    convolution2dLayer(9, 32, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
+    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same','WeightL2Factor',1e-3)  %bottleneck
     leakyReluLayer('Name', 'relu2')
 
     %vvs-net
@@ -38,7 +38,7 @@ net=dlnetwork(layers);
 % Scale conv2 weights
 conv2_idx = find(strcmp({net.Layers.Name}, 'conv2'));
 conv2 = net.Layers(conv2_idx);
-conv2.Weights = 1 * conv2.Weights;
+conv2.Weights = 0.1 * conv2.Weights;
 net = replaceLayer(net, 'conv2', conv2);
 
 exinputsize=net.Layers(1).InputSize;
@@ -67,9 +67,9 @@ options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
     'Plots', 'training-progress', ...
     'Metrics', 'accuracy');
 %% Train
-retNet21 = trainnet(imds_train_resized, net,"crossentropy",options);
+retNet22 = trainnet(imds_train_resized, net,"crossentropy",options);
 %% Save
-save('retnet21.mat','retNet21')
+save('retnet22.mat','retNet22')
 %% Evaluate
 scores=minibatchpredict(genNet8,imds_test_resized);
 classes=categories(imds_test.Labels);
