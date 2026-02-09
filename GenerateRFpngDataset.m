@@ -375,8 +375,8 @@ end
 
 function config = getRFConfig() 
     config.image_size = 25;
-    config.center_position_range = [8, 17];  % min, max for both x and y
-    config.center_radius_range = [1.5, 4.0];  % radius in pixels
+    config.center_position_range = [12, 13];  % min, max for both x and y
+    config.center_radius_range = [1.5, 2.5];  % radius in pixels
     config.surround_multiplier_range = [1.3, 2.2];  % surround = center * multiplier
     config.amplitude_range = [0.5, 1.5];  % strength of response
     config.noise_level_range = [0.0, 0.2];  % noise as fraction of signal
@@ -851,7 +851,7 @@ function img_normalized = normalizeForPNG(img)
     img_normalized = uint8(max(0, min(255, img_scaled)));
 end
 
-saveRFDataset(500,500,'rf_dataset500', 'split_train_test', true)
+saveRFDataset(500,500,'rf_dataset500(1)', 'split_train_test', true)
 %% 
 % Re-examine your training data
 [cs_batch, ~] = generateBatch(5, 'visualize', true);  % Force visualization

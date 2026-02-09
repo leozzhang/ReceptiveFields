@@ -154,7 +154,8 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
         end
         
         % Try small random perturbations to weights
-        weight_update = randn(size(current_conv2_weights)) * 0.5;
+        %weight_update = randn(size(current_conv2_weights)) * 0.5; normal
+        weight_update = (rand(size(current_conv2_weights)) * 2 - 1) * 0.86;  % Uniform in [-0.86, +0.86]
         temp_weights = current_conv2_weights + weight_update;
         
         % Create new network with updated weights
@@ -239,6 +240,31 @@ function optimized_weights = simpleGradientOptimization(net, target_image_path)
     imagesc(final_gradient);
     colormap gray;
     title('Final Gradient');
+end
+function uniform_weights = transformToUniform(weights, target_min, target_max)
+% TRANSFORMTOUNIFORM - Transform weight distribution to uniform
+% Preserves spatial pattern but changes distribution shape
+%
+% Inputs:
+%   weights - Original weights (any distribution)
+%   target_min - Desired minimum value (e.g., -0.01)
+%   target_max - Desired maximum value (e.g., 0.01)
+
+% Flatten weights
+original_shape = size(weights);
+flat_weights = weights(:);
+
+% Get the ranks (this preserves the spatial pattern)
+[~, sort_idx] = sort(flat_weights);
+ranks = zeros(size(flat_weights));
+ranks(sort_idx) = 1:length(flat_weights);
+
+% Map ranks to uniform distribution
+n = length(flat_weights);
+uniform_flat = target_min + (target_max - target_min) * (ranks - 1) / (n - 1);
+
+% Reshape back
+uniform_weights = reshape(uniform_flat, original_shape);
 end
 optimized_conv2_weights18=simpleGradientOptimization(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
 
@@ -400,14 +426,92 @@ load("retnet8.mat","retNet8");
 generateOptimizationFigureImages(retNet8, "C:\Users\leozi\OneDrive\Desktop\Research\rf_dataset500\train\center_surround\cs_train_0011.png")
 
 %% 
-% Simple weight visualization
-load('optimized_conv2_weights17.mat');
+% Load original optimized weights
+load('optimized_conv2_weights38.mat', 'optimized_conv2_weights38');
+opt_weights_normal = optimized_conv2_weights38;
 
-% Visualize first slice (9x9 from first conv1 channel connection)
-figure;
-imagesc(optimized_conv2_weights17(:,:,1,1));
-colormap('gray');
-colorbar;
+% Transform to uniform distribution
+opt_weights_uniform = transformToUniform(opt_weights_normal, -0.005, 0.005);
+
+% Load retNet8 as base network
+load('retnet8.mat', 'retNet8');
+
+% Create two networks: one with normal weights, one with uniform weights
+% Network 1: Normal distribution weights
+net_normal_layers = [
+    imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
+    convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...
+        'Weights', retNet8.Layers(2).Weights, 'Bias', retNet8.Layers(2).Bias)
+    reluLayer('Name', 'relu1')
+    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...
+        'Weights', opt_weights_normal, 'Bias', retNet8.Layers(4).Bias)
+    leakyReluLayer('Name', 'relu2')
+    convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+    reluLayer('Name', 'relu3')
+    convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+    reluLayer('Name', 'relu4')
+    fullyConnectedLayer(1024, 'Name', 'fc1')
+    reluLayer('Name', 'relu5')
+    fullyConnectedLayer(10, 'Name', 'fc_output')
+    softmaxLayer('Name', 'softmax')
+];
+net_normal = dlnetwork(net_normal_layers);
+
+% Network 2: Uniform distribution weights
+net_uniform_layers = [
+    imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
+    convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...
+        'Weights', retNet8.Layers(2).Weights, 'Bias', retNet8.Layers(2).Bias)
+    reluLayer('Name', 'relu1')
+    convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...
+        'Weights', opt_weights_uniform, 'Bias', retNet8.Layers(4).Bias)
+    leakyReluLayer('Name', 'relu2')
+    convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+    reluLayer('Name', 'relu3')
+    convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+    reluLayer('Name', 'relu4')
+    fullyConnectedLayer(1024, 'Name', 'fc1')
+    reluLayer('Name', 'relu5')
+    fullyConnectedLayer(10, 'Name', 'fc_output')
+    softmaxLayer('Name', 'softmax')
+];
+net_uniform = dlnetwork(net_uniform_layers);
+
+% Compute receptive fields using Lindsey method
+fprintf('Computing RF with normal distribution weights...\n');
+rf_normal = computeFilterRF_LindseyMethod(net_normal, 'conv2', 1, 'InputSize', [32, 32, 1]);
+
+fprintf('Computing RF with uniform distribution weights...\n');
+rf_uniform = computeFilterRF_LindseyMethod(net_uniform, 'conv2', 1, 'InputSize', [32, 32, 1]);
+
+% Visualize comparison
+figure('Position', [100, 100, 1400, 500]);
+
+subplot(1,3,1);
+imagesc(rf_normal);
+colormap gray;
 axis square;
-title('Optimized Conv2 Weights (slice 1)');
+title('RF: Normal Distribution Weights');
+colorbar;
 
+subplot(1,3,2);
+imagesc(rf_uniform);
+colormap gray;
+axis square;
+title('RF: Uniform Distribution Weights');
+colorbar;
+
+subplot(1,3,3);
+imagesc(rf_normal - rf_uniform);
+colormap gray;
+axis square;
+title('Difference (should be minimal)');
+colorbar;
+
+sgtitle('Receptive Field Comparison: Normal vs Uniform Weight Distribution');
+
+% Quantify similarity
+corr_rf = corr(rf_normal(:), rf_uniform(:));
+fprintf('\n=== RF Similarity ===\n');
+fprintf('Correlation between RFs: %.6f (should be ~1.0)\n', corr_rf);
+fprintf('Mean absolute difference: %.6f (should be small)\n', mean(abs(rf_normal(:) - rf_uniform(:))));

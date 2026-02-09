@@ -11,7 +11,7 @@ fprintf('PHASE 1: Training 20 retNet models\n');
 fprintf('========================================\n\n');
 
 for seed_idx = 3:22
-    model_num = seed_idx + 20; % retnet23, retnet24, ..., retnet42
+    model_num = seed_idx + 40; % retnet23, retnet24, ..., retnet42
     
     fprintf('\n--- Training retNet%d (seed %d) ---\n', model_num, seed_idx);
     
@@ -116,9 +116,9 @@ genetic_conv1_bias = retNet8.Layers(2).Bias;
 genetic_conv2_bias = retNet8.Layers(4).Bias;
 
 for model_idx = 1:20
-    weight_num = 17 + model_idx; % optimized_conv2_weights18, 19, ..., 37
+    weight_num = 37 + model_idx; % optimized_conv2_weights18, 19, ..., 37
     img_num = 127 + model_idx; % cs_train_0128.png, ..., 0147.png
-    gennet_num = 827 + model_idx; % gennet828, ..., gennet847
+    gennet_num = 847 + model_idx; % gennet828, ..., gennet847
     
     fprintf('\n--- Creating genNet%d (weights%d, image%d) ---\n', ...
         gennet_num, weight_num, img_num);
@@ -127,7 +127,7 @@ for model_idx = 1:20
         %% Step 1: Reverse engineer weights
         fprintf('Step 1: Reverse engineering weights...\n');
         
-        target_image_path = sprintf('C:\\Users\\leozi\\OneDrive\\Desktop\\Research\\rf_dataset500\\train\\center_surround\\cs_train_%04d.png', img_num);
+        target_image_path = sprintf('C:\\Users\\leozi\\OneDrive\\Desktop\\Research\\rf_dataset500(1)\\train\\center_surround\\cs_train_%04d.png', img_num);
         
         % Run optimization
         optimized_weights = simpleGradientOptimization(retNet8, target_image_path);
@@ -143,7 +143,7 @@ for model_idx = 1:20
         %% Step 2: Build genNet architecture
         fprintf('Step 2: Building genNet architecture...\n');
         
-        rng(model_idx + 2) % Use different seed for each genNet
+        rng(2)
         
         layers = [
             imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
@@ -235,6 +235,157 @@ fprintf('ALL TRAINING COMPLETE!\n');
 fprintf('Total models trained: 40\n');
 fprintf('- retNet models: retnet23.mat through retnet42.mat\n');
 fprintf('- genNet models: gennet828.mat through gennet847.mat\n');
+fprintf('========================================\n');
+%% 
+%% UNIFORM WEIGHTS TRAINING SCRIPT
+% Step 1: Transform existing optimized weights to uniform distribution
+% Step 2: Train 20 new genNet models with uniform weights (genNet868-887)
+
+fprintf('\n========================================\n');
+fprintf('STEP 1: Transforming weights to uniform\n');
+fprintf('========================================\n\n');
+
+% Transform optimized_conv2_weights38 through 57 to uniform
+for weight_num = 38:57
+    fprintf('Transforming optimized_conv2_weights%d...\n', weight_num);
+    
+    try
+        % Load original weights
+        load_varname = sprintf('optimized_conv2_weights%d', weight_num);
+        load_filename = sprintf('optimized_conv2_weights%d.mat', weight_num);
+        load(load_filename, load_varname);
+        opt_weights_normal = eval(load_varname);
+        
+        % Transform to uniform distribution
+        opt_weights_uniform = transformToUniform(opt_weights_normal, -0.005, 0.005);
+        
+        % Save with new name
+        save_varname = sprintf('optimized_conv2_uniform%d', weight_num);
+        save_filename = sprintf('optimized_conv2_uniform%d.mat', weight_num);
+        eval([save_varname ' = opt_weights_uniform;']);
+        save(save_filename, save_varname);
+        
+        fprintf('✓ Saved %s\n', save_filename);
+        
+    catch ME
+        fprintf('✗ ERROR transforming weights%d: %s\n', weight_num, ME.message);
+    end
+end
+
+fprintf('\n========================================\n');
+fprintf('STEP 2: Training 20 genNet models\n');
+fprintf('========================================\n\n');
+
+% Load retNet8 once (used as base for all models)
+load('retnet8.mat', 'retNet8');
+genetic_conv1_weights = retNet8.Layers(2).Weights;
+genetic_conv1_bias = retNet8.Layers(2).Bias;
+genetic_conv2_bias = retNet8.Layers(4).Bias;
+
+% Train 20 models
+for model_idx = 1:20
+    weight_num = 37 + model_idx; % optimized_conv2_uniform38 through 57
+    gennet_num = 867 + model_idx; % genNet868 through 887
+    
+    fprintf('\n--- Training genNet%d (uniform weights%d) ---\n', gennet_num, weight_num);
+    
+    try
+        %% Load uniform weights
+        load_varname = sprintf('optimized_conv2_uniform%d', weight_num);
+        load_filename = sprintf('optimized_conv2_uniform%d.mat', weight_num);
+        load(load_filename, load_varname);
+        optimized_weights_uniform = eval(load_varname);
+        
+        %% Build genNet architecture with uniform weights
+        fprintf('Building genNet architecture...\n');
+        
+        rng(model_idx + 100) % Different seed for each model
+        
+        layers = [
+            imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
+            
+            % GENETIC layers from retNet8
+            convolution2dLayer(9, 32, 'Name', 'conv1', 'Padding', 'same', ...
+                'Weights', genetic_conv1_weights, ...
+                'Bias', genetic_conv1_bias, ...
+                'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
+            reluLayer('Name', 'relu1')
+            
+            convolution2dLayer(9, 1, 'Name', 'conv2', 'Padding', 'same', ...
+                'Weights', optimized_weights_uniform, ...
+                'Bias', genetic_conv2_bias, ...
+                'WeightLearnRateFactor', 0.2, 'BiasLearnRateFactor', 0)
+            leakyReluLayer('Name', 'relu2')
+            
+            % TRAINABLE layers (experience-dependent)
+            convolution2dLayer(9, 32, 'Name', 'conv3', 'Padding', 'same')
+            reluLayer('Name', 'relu3')
+            convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
+            reluLayer('Name', 'relu4')
+            fullyConnectedLayer(1024, 'Name', 'fc1')
+            reluLayer('Name', 'relu5')
+            fullyConnectedLayer(10, 'Name', 'fc_output')
+            softmaxLayer('Name', 'softmax')
+        ];
+        
+        net = dlnetwork(layers);
+        exinputsize = net.Layers(1).InputSize;
+        
+        %% Load and prepare data
+        fprintf('Loading data...\n');
+        
+        trainPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\train';
+        testPath='C:\Users\leozi\OneDrive\Desktop\Research\cifar10\cifar10\test';
+        imds_train=imageDatastore(trainPath,'IncludeSubfolders',true,'LabelSource','foldernames');
+        imds_test=imageDatastore(testPath,"IncludeSubfolders",true, 'LabelSource','foldernames');
+        [imds_train_split, imds_val_split] = splitEachLabel(imds_train, 0.8, 'randomized');
+        
+        imds_train_resized = augmentedImageDatastore(exinputsize(1:2), imds_train_split,"ColorPreprocessing","rgb2gray");
+        imds_test_resized = augmentedImageDatastore(exinputsize(1:2), imds_test,"ColorPreprocessing","rgb2gray");
+        imds_val_resized = augmentedImageDatastore(exinputsize(1:2), imds_val_split,"ColorPreprocessing","rgb2gray");
+        
+        %% Train
+        fprintf('Training genNet%d...\n', gennet_num);
+        
+        batchSize=32;
+        maxEpochs=20;
+        learningRate=0.0001;
+        
+        options=trainingOptions('rmsprop','MiniBatchSize',batchSize, ...
+            'MaxEpochs',maxEpochs, ...
+            'InitialLearnRate',learningRate, 'Shuffle','every-epoch', ...
+            'Verbose', true, ...
+            'ValidationData', imds_val_resized, ...
+            'ValidationFrequency', 50, ...
+            'ValidationPatience', 10, ...
+            'L2Regularization', 1e-5, ...
+            'Plots', 'training-progress', ...
+            'Metrics', 'accuracy');
+        
+        trainedNet = trainnet(imds_train_resized, net,"crossentropy",options);
+        
+        %% Save genNet
+        gennet_save_filename = sprintf('gennet%d.mat', gennet_num);
+        gennet_save_varname = sprintf('genNet%d', gennet_num);
+        eval([gennet_save_varname ' = trainedNet;']);
+        save(gennet_save_filename, gennet_save_varname);
+        
+        fprintf('✓ Successfully saved %s\n', gennet_save_filename);
+        
+    catch ME
+        fprintf('✗ ERROR creating genNet%d: %s\n', gennet_num, ME.message);
+        fprintf('Continuing to next model...\n');
+    end
+    
+    % Clear variables to free memory
+    clear net trainedNet optimized_weights_uniform imds_train imds_test
+    clear imds_train_split imds_val_split imds_train_resized imds_test_resized imds_val_resized
+end
+
+fprintf('\n========================================\n');
+fprintf('ALL TRAINING COMPLETE!\n');
+fprintf('Total uniform weight files: 20 (optimized_conv2_uniform38-57)\n');
+fprintf('Total genNet models trained: 20 (gennet868-887)\n');
 fprintf('========================================\n');
 
 %% ====================================================================
@@ -497,9 +648,9 @@ end
 
 
 % For your 20 retNet models (retnet23 through retnet42)
-retnet_names = arrayfun(@(x) sprintf('retNet%d', x), 23:42, 'UniformOutput', false);
-visualizeFilters_MultipleNets(retnet_names, 'conv2', 1);
+%retnet_names = arrayfun(@(x) sprintf('retNet%d', x), 23:42, 'UniformOutput', false);
+%visualizeFilters_MultipleNets(retnet_names, 'conv3', 1);
 
 % For your 20 genNet models (gennet828 through gennet847)
-gennet_names = arrayfun(@(x) sprintf('genNet%d', x), 828:847, 'UniformOutput', false);
+gennet_names = arrayfun(@(x) sprintf('genNet%d', x), 868:887, 'UniformOutput', false);
 visualizeFilters_MultipleNets(gennet_names, 'conv2', 1);
