@@ -32,7 +32,14 @@ for seed_idx = 3:22
             reluLayer('Name', 'relu3')
             convolution2dLayer(9,32,'Name','conv4', 'Padding', 'same')
             reluLayer('Name','relu4')
-            fullyConnectedLayer(1024,'Name', 'fc1')
+            convolution2dLayer(9,32,"Name","conv5","Padding","same")
+            reluLayer("Name","reluextra")
+            convolution2dLayer(9,32,"Name","conv6","Padding","same")
+            reluLayer("Name","reluextra2")
+            convolution2dLayer(9,32,"Name","conv7","Padding","same")
+            reluLayer("Name","reluextra3")
+            
+            fullyConnectedLayer(1024, 'Name', 'fc1')
             reluLayer('Name', 'relu5')
             fullyConnectedLayer(10, 'Name', 'fc_output')
             softmaxLayer('Name', 'softmax')
@@ -271,6 +278,7 @@ for weight_num = 38:57
         fprintf('✗ ERROR transforming weights%d: %s\n', weight_num, ME.message);
     end
 end
+%% 
 
 fprintf('\n========================================\n');
 fprintf('STEP 2: Training 20 genNet models\n');
@@ -285,7 +293,7 @@ genetic_conv2_bias = retNet8.Layers(4).Bias;
 % Train 20 models
 for model_idx = 1:20
     weight_num = 37 + model_idx; % optimized_conv2_uniform38 through 57
-    gennet_num = 867 + model_idx; % genNet868 through 887
+    gennet_num = 887 + model_idx; % genNet868 through 887
     
     fprintf('\n--- Training genNet%d (uniform weights%d) ---\n', gennet_num, weight_num);
     
@@ -299,7 +307,7 @@ for model_idx = 1:20
         %% Build genNet architecture with uniform weights
         fprintf('Building genNet architecture...\n');
         
-        rng(model_idx + 100) % Different seed for each model
+        rng(2)
         
         layers = [
             imageInputLayer([32 32 1], 'Name', 'input', 'Normalization', 'none')
@@ -322,10 +330,18 @@ for model_idx = 1:20
             reluLayer('Name', 'relu3')
             convolution2dLayer(9, 32, 'Name', 'conv4', 'Padding', 'same')
             reluLayer('Name', 'relu4')
+            convolution2dLayer(9,32,"Name","conv5","Padding","same")
+            reluLayer("Name","reluextra")
+            convolution2dLayer(9,32,"Name","conv6","Padding","same")
+            reluLayer("Name","reluextra2")
+            convolution2dLayer(9,32,"Name","conv7","Padding","same")
+            reluLayer("Name","reluextra3")
+            
             fullyConnectedLayer(1024, 'Name', 'fc1')
             reluLayer('Name', 'relu5')
             fullyConnectedLayer(10, 'Name', 'fc_output')
             softmaxLayer('Name', 'softmax')
+
         ];
         
         net = dlnetwork(layers);
@@ -648,9 +664,9 @@ end
 
 
 % For your 20 retNet models (retnet23 through retnet42)
-%retnet_names = arrayfun(@(x) sprintf('retNet%d', x), 23:42, 'UniformOutput', false);
-%visualizeFilters_MultipleNets(retnet_names, 'conv3', 1);
+% retnet_names = arrayfun(@(x) sprintf('retNet%d', x), 43:62, 'UniformOutput', false);
+% visualizeFilters_MultipleNets(retnet_names, 'conv7', 1);
 
 % For your 20 genNet models (gennet828 through gennet847)
-gennet_names = arrayfun(@(x) sprintf('genNet%d', x), 868:887, 'UniformOutput', false);
+gennet_names = arrayfun(@(x) sprintf('genNet%d', x), 888:907, 'UniformOutput', false);
 visualizeFilters_MultipleNets(gennet_names, 'conv2', 1);

@@ -128,9 +128,9 @@ layers = [
 newnet=dlnetwork(layers);
 
 load("retNet21.mat","retNet21")
-visualizeFilters_LindseyMethod(retNet42, "conv4", 32)
+visualizeFilters_LindseyMethod(retNet48, "conv4", 32)
 
-%% 
+%% for figure
 function visualizeGradientAscentWithGradient(net, layerName, filterIndex, varargin)
 % VISUALIZEGRADIENTASCENTWITHGRADIENT - Show the gradient explicitly
 %
@@ -244,3 +244,121 @@ end
 
 load('retnet13.mat', 'retNet13');
 visualizeGradientAscentWithGradient(retNet13, 'conv2', 1);
+
+%% test for activations and gradients in conv3,4 leading to GRF that is all gray
+
+function [rf, diagnostics] = computeFilterRF_Diagnostic(net, layerName, filterIndex, varargin)
+% COMPUTEFILTERRF_DIAGNOSTIC - Diagnostic version of Lindsey method
+% Returns both the RF visualization AND raw gradient information
+
+% Parse inputs
+p = inputParser;
+addParameter(p, 'InputSize', [32, 32, 1], @isnumeric);
+addParameter(p, 'StepSize', 1.0, @isnumeric);
+addParameter(p, 'SpatialPos', 'center', @ischar);
+parse(p, varargin{:});
+
+inputSize = p.Results.InputSize;
+stepSize = p.Results.StepSize;
+spatialPos = p.Results.SpatialPos;
+
+% Initialize input exactly like the paper: gray image (0.5)
+inputImg = dlarray(0.5 * ones([inputSize, 1], 'single'), 'SSCB');
+
+% Forward pass - check layer activation magnitude BEFORE gradient computation
+layerOutput = forward(net, inputImg, 'Outputs', layerName);
+layerOutputData = extractdata(layerOutput);
+
+% Store forward pass diagnostics
+diagnostics.layer_activation_mean = mean(abs(layerOutputData(:)));
+diagnostics.layer_activation_max = max(abs(layerOutputData(:)));
+diagnostics.layer_activation_std = std(layerOutputData(:));
+diagnostics.layer_activation_filter = layerOutputData(:,:,filterIndex,1); % spatial map of this filter
+diagnostics.center_activation = layerOutputData(round(size(layerOutputData,1)/2), ...
+                                                round(size(layerOutputData,2)/2), ...
+                                                filterIndex, 1);
+fprintf('  [%s] Filter %d center activation: %.6f\n', layerName, filterIndex, diagnostics.center_activation);
+fprintf('  [%s] Layer activation mean: %.6f, max: %.6f\n', layerName, ...
+    diagnostics.layer_activation_mean, diagnostics.layer_activation_max);
+
+% Single gradient step
+[loss, gradients] = dlfeval(@lindseyLossFcn, net, inputImg, layerName, filterIndex, spatialPos);
+
+% Store raw gradient diagnostics BEFORE normalization
+gradData = extractdata(gradients);
+diagnostics.raw_grad_norm = sqrt(sum(gradients.^2, 'all'));
+diagnostics.raw_grad_norm = extractdata(diagnostics.raw_grad_norm);
+diagnostics.raw_grad_mean = mean(abs(gradData(:)));
+diagnostics.raw_grad_max = max(abs(gradData(:)));
+diagnostics.loss_value = extractdata(loss);
+diagnostics.below_threshold = diagnostics.raw_grad_norm <= 1e-5;
+
+fprintf('  [%s] Filter %d raw gradient norm: %.10f\n', layerName, filterIndex, diagnostics.raw_grad_norm);
+fprintf('  [%s] Filter %d loss value: %.10f\n', layerName, filterIndex, diagnostics.loss_value);
+% Check what fraction of the 9x9 neighborhood around center is positive
+[H, W, C, B] = size(layerOutputData);
+center_h = round(H/2);
+center_w = round(W/2);
+half_kernel = 4; % for 9x9 kernel
+neighborhood = layerOutputData(...
+    max(1,center_h-half_kernel):min(H,center_h+half_kernel), ...
+    max(1,center_w-half_kernel):min(W,center_w+half_kernel), :, :);
+diagnostics.neighborhood_positive_fraction = mean(neighborhood(:) > 0);
+fprintf('  [%s] Fraction of 9x9 neighborhood positive: %.4f\n', ...
+    layerName, diagnostics.neighborhood_positive_fraction);
+if diagnostics.below_threshold
+    fprintf('  *** WARNING: Gradient norm below threshold (%.2e <= 1e-5)! RF will be gray. ***\n', ...
+        diagnostics.raw_grad_norm);
+else
+    fprintf('  [%s] Gradient norm above threshold, RF should be visible\n', layerName);
+end
+
+% Normalize gradients
+gradNorm = sqrt(sum(gradients.^2, 'all'));
+if gradNorm > 1e-5
+    gradients = gradients / (gradNorm + 1e-5);
+end
+
+% Single update step
+inputImg = inputImg + stepSize * gradients;
+
+% Extract result
+rf = extractdata(squeeze(inputImg(:, :, 1, 1)));
+
+% Post-process exactly like the paper
+rf = rf - mean(rf(:));
+rf_std = std(rf(:));
+if rf_std > 1e-5
+    rf = rf / rf_std;
+end
+rf = rf * 0.1;
+rf = rf + 0.5;
+rf = max(0, min(1, rf));
+
+diagnostics.rf_std = rf_std;
+diagnostics.rf_is_gray = rf_std <= 1e-5;
+end
+
+
+% Load one of the affected retNets
+load('retnet43.mat', 'retNet43');  % replace with whichever shows all-gray conv4
+net = retNet62;
+inputSize = net.Layers(1).InputSize;
+
+fprintf('\n========== DIAGNOSTIC RUN ==========\n');
+fprintf('\n--- Checking conv2 ---\n');
+[rf2, diag2] = computeFilterRF_Diagnostic(net, 'conv2', 1, 'InputSize', inputSize);
+
+fprintf('\n--- Checking conv3 ---\n');
+[rf3, diag3] = computeFilterRF_Diagnostic(net, 'conv3', 1, 'InputSize', inputSize);
+
+fprintf('\n--- Checking conv4 ---\n');
+[rf4, diag4] = computeFilterRF_Diagnostic(net, 'conv4', 1, 'InputSize', inputSize);
+
+% Summary
+fprintf('\n========== SUMMARY ==========\n');
+fprintf('Layer   | Grad Norm      | Center Act  | Below Thresh?\n');
+fprintf('conv2   | %.10f | %.6f    | %d\n', diag2.raw_grad_norm, diag2.center_activation, diag2.below_threshold);
+fprintf('conv3   | %.10f | %.6f    | %d\n', diag3.raw_grad_norm, diag3.center_activation, diag3.below_threshold);
+fprintf('conv4   | %.10f | %.6f    | %d\n', diag4.raw_grad_norm, diag4.center_activation, diag4.below_threshold);
+%% 
