@@ -128,7 +128,7 @@ layers = [
 newnet=dlnetwork(layers);
 
 load("retNet21.mat","retNet21")
-visualizeFilters_LindseyMethod(retNet48, "conv4", 32)
+visualizeFilters_LindseyMethod(retNet43, "conv2", 1)
 
 %% for figure
 function visualizeGradientAscentWithGradient(net, layerName, filterIndex, varargin)

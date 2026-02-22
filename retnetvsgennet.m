@@ -6,7 +6,7 @@ retnet_nums = 43:62;   % your 20 retNets
 gennet_nums = 888:907; % your 20 genNets
 
 num_nets = 20;
-layers_to_check = {'conv2', 'conv3', 'conv4'};
+layers_to_check = {'conv2', 'conv3', 'conv4', 'conv5', 'conv6', 'conv7'};
 
 % Initialize storage structs
 retnet_stats = struct();
@@ -220,11 +220,14 @@ for l = 1:length(layers_to_check)
 end
 
 %% Visualize
-figure('Position', [100, 100, 1400, 900]);
+figure('Position', [100, 100, 2400, 1200]);
 
-metrics = {'neighborhood_pos_frac', 'grad_norm', 'act_pos_frac', 'weight_skewness'};
+metrics = {'neighborhood_pos_frac', 'grad_norm', 'act_pos_frac', 'weight_skewness', 'weight_mean'};
 metric_labels = {'Neighborhood Positive Fraction', 'Gradient Norm', ...
-    'Activation Positive Fraction', 'Weight Skewness'};
+    'Activation Positive Fraction', 'Weight Skewness', 'Weight Mean'};
+failed_net_nums = [43, 46, 47, 48, 51, 54];
+retnet_nums = 43:62;  % Match whatever range you used in your analysis
+failed_idx = find(ismember(retnet_nums, failed_net_nums));
 
 plot_idx = 1;
 for m = 1:length(metrics)
@@ -248,7 +251,6 @@ for m = 1:length(metrics)
         scatter(2*ones(num_nets,1) + 0.1*randn(num_nets,1), gennet_vals, 30, 'r', 'filled', 'MarkerFaceAlpha', 0.5);
         
         % Highlight failed retNets
-        failed_idx = find(retnet_stats.conv4_failed);
         if ~isempty(failed_idx)
             scatter(ones(length(failed_idx),1) + 0.1*randn(length(failed_idx),1), ...
                 retnet_vals(failed_idx), 60, 'k', 'filled', 'MarkerEdgeColor', 'red', 'LineWidth', 2);
